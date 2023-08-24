@@ -372,14 +372,14 @@ const PINT p2 = &i2;	//p可以更改，p指向的内容不能更改，相当于 
 3. 执行构造函数中的代码（为这个新对象添加属性）
 4. 返回新对象
 
-### 如何让 new 不抛出异常？
+#### 如何让 new 不抛出异常？
 
 1. 使用 `new(std::nothrow)` 关键字，当 new 一个对象失败时，默认设置对象为 NULL。
 2. 通过 `set_new_handler(noMoreMemory);` 让 new 抛出异常时，执行程序给定的handler。一般来说 handler 只有两个选择：
    - 让更多memory可用（调用了程序员指定的handler，表示内存基本用完了，程序员可以选择释放一些其他的内存，C++会再次尝试new）
    - 调用 abort() 或 exit()
 
-#### new 和 malloc 的区别
+#### new 和 malloc 的区别（底层）
 
 - `new` 会先调用 `operator new` 函数，申请足够的内存（底层使用 `malloc` 实现），再调用对象的构造函数，初始化成员变量，最后返回自定义类型指针。`delete` 先调用析构函数，然后调用 `operator delete` 函数释放内存（通常底层使用free实现）。
   `malloc/free` 是库函数， 仅仅在堆中申请一块指定大小的内存空间，并不会对内存和对象进行初始化。
