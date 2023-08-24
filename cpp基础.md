@@ -372,7 +372,7 @@ const PINT p2 = &i2;	//p可以更改，p指向的内容不能更改，相当于 
 3. 执行构造函数中的代码（为这个新对象添加属性）
 4. 返回新对象
 
-> 如何让 new 不抛出异常？
+### 如何让 new 不抛出异常？
 
 1. 使用 `new(std::nothrow)` 关键字，当 new 一个对象失败时，默认设置对象为 NULL。
 2. 通过 `set_new_handler(noMoreMemory);` 让 new 抛出异常时，执行程序给定的handler。一般来说 handler 只有两个选择：
