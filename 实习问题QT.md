@@ -311,7 +311,7 @@ lambda表达式
 
 ## 7. Qt的D指针（`d_ptr`）与Q指针（`q_ptr`）
 
-### D指针
+D指针
 
 PIMPL模式，指向一个包含所有数据的私有数据结构体。
 
@@ -320,18 +320,18 @@ PIMPL模式，指向一个包含所有数据的私有数据结构体。
 - 头文件中没有任何实现细节，可以作为API使用
 - 原本在头文件的实现部分转移到乐源文件，所以编译速度有所提高
 
-### Q指针
+Q指针
 
 私有的结构体中储存一个指向公有类的Q指针。
 
-### 总结
+ 总结
 
 - Qt中的一个类常用一个PrivateXXX类来处理内部逻辑，使得内部逻辑与外部接口分开，这个PrivateXXX对象通过D指针来访问；在PrivateXXX中有需要引用Owner的内容，通过Q指针来访问。
 - 由于D和Q指针是从基类继承下来的，子类中由于继承导致类型发生变化，需要通过`static_cast`类型转化，所以`DPTR()`与`QPTR()`宏定义实现了转换。
 
 
 
-### 题目
+ 题目
 
 - 讲一下Qt的D指针和Q指针？
 
@@ -374,13 +374,13 @@ Qt的智能指针包括：
 - QPointer
 - QSharedDataPointer
 
-### QSharedPointer
+ QSharedPointer
 
 相当于`std::shared_ptr`，内部维持着对拥有的内存资源的引用计数，引用计数下降到0时，这个内存资源就被释放了。
 
 QSharedPointer是线程安全的，多个线程同时修改QSharedPointer对象也不需要加锁，但是QSharedPointer指向的内存区域不一定是线程安全的，所以多个线程同时修改QSharedPointer指向的数据时还要考虑加锁。
 
-### QWeakPointer
+ QWeakPointer
 
 类似于`std::weak_ptr`。
 
