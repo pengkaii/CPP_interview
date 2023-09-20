@@ -2114,14 +2114,17 @@ reactor多线程、以及主从reactor模式。
 ##### 6.1 LFU缓存淘汰实现（双重链表+双哈希）
 
 **LFU主要对象有四个：**
-⼀个⼤链表 FreqList ，⼀个⼩链表 KeyList ，⼀个 key-FreqList 的哈希表 FreqHash 以及⼀个 key->KeyNode 的哈希表 KeyNodeHash ，
-**FreqList** ：链表的每个节点都是⼀个⼩链表附带⼀个值表示频度，频度⽤来记录每个key的访问次数
-**KeyList** ：同⼀频度下的key value节点 KeyNode ，只要找到 key 对应的 KeyNode ，就可以找到对应的value
-**FreqHash** ：key到⼤链表节点的映射，这个主要是为了更新频度，因为更新频度需要先将 KeyNode 节点从当前频度的⼩链表中删除，然后加⼊下⼀频度的⼩链表（通过遍历⼤链表即可找到）
-**KeyNodeHash** ：key到⼩链表节点的映射，这个Hash主要是为了根据key来找到对应的 KeyNode ，从⽽获得对应的value
+⼀个⼤链表 FreqList ，⼀个⼩链表 KeyList ，⼀个 key-FreqList 的哈希表 FreqHash 以及⼀个 key->KeyNode 的哈希表 KeyNodeHash ;
+
+**FreqList** ：链表的每个节点都是⼀个⼩链表附带⼀个值表示频度，频度⽤来记录每个key的访问次数;
+**KeyList** ：同⼀频度下的key value节点 KeyNode ，只要找到 key 对应的 KeyNode ，就可以找到对应的value;
+**FreqHash** ：key到⼤链表节点的映射，这个主要是为了更新频度，因为更新频度需要先将 KeyNode 节点从当前频度的⼩链表中删除，然后加⼊下⼀频度的⼩链表（通过遍历⼤链表即可找到）;
+**KeyNodeHash** ：key到⼩链表节点的映射，这个Hash主要是为了根据key来找到对应的 KeyNode ，从⽽获得对应的value;
+
 **LFU主要两个函数实现：**
-         bool LFUCache::**get**(string& key, string& val) 和 void LFUCache::**set**(string& key, string& val) 。 
-        **get(2)** 就是先在 FreqHash 中找有没有 key 对应的节点，
+bool LFUCache::**get**(string& key, string& val) 和 void LFUCache::**set**(string& key, string& val) 。 
+	
+ **get(2)** 就是先在 FreqHash 中找有没有 key 对应的节点，
         如果没有，就是缓存未命中，由⽤户调⽤ **set(2)** 向缓存中添加节点，如果缓存已满的话就在频度最低的⼩链表中删除最后⼀个节点；如果有，就是缓存命中，此时需要更新当前节点的频度（先将 KeyNode 节点从当前频度的⼩链表中删除，然后加⼊下⼀频度的⼩链表），加⼊下⼀频度的⼩链表的头部，这部分与LRU类似。
        ⽽对于 WebServer 来说，key就是对应的⽂件名，value就是对应的⽂件内容（通过 mmap() 映射），这样来建⽴⻚⾯缓存还是⽐较简单的。
 
