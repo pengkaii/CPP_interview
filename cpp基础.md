@@ -414,6 +414,7 @@ const PINT p2 = &i2;	//p可以更改，p指向的内容不能更改，相当于 
 - 重写函数的访问权限必须大于被重写函数的访问权限
 
   
+
 class Base {
     virtual void func();
 };
@@ -2305,9 +2306,9 @@ O2优化再打开O1优化的前提下，尝试更多的寄存器级的优化以�
 
 
     通过 public、protected、private 三个关键字来控制成员变量和成员函数的访问权限，它们分别表示公有的、受保护的、私有的，被称为成员访问限定符。
-  
+      
     在类的内部（定义类的代码内部），无论成员被声明为 public、protected 还是 private，都是可以互相访问的，没有访问权限的限制。
-
+    
     在类的外部（定义类的代码之外），只能通过对象访问成员，并且通过对象只能访问 public 属性的成员，不能访问 private、protected 属性的成员.
 
   - 继承：**让某种类型对象获得另一个类型对象的属性和方法，使得派生类可以使用父类的所有功能，并在无需重新编写原来的类的情况下对这些功能进行扩展。**
@@ -4590,17 +4591,15 @@ this指针会因**编译器不同**而有不同的放置位置。可能是**栈�
 
 ### 智能指针作用、3个
 
-**作用：**
+**作用：**处理内存泄漏问题和空悬指针问题。
 
 智能指针是一个**RAII类模型，用于动态分配内存**，其设计思想是将基本类型指针封装为（模板）类对象指针，并在离开作用域时调用析构函数，使用`delete`删除指针所指向的内存空间。
-
-处理内存泄漏问题和空悬指针问题。
 
 智能指针的作用是管理一个指针，因为存在申请的空间在函数结束时忘记释放，造成内存泄漏的情况。使用智能指针可以很大程度上避免这个问题，因为智能指针就是一个类，当超出了类的作用域时，类会自动调用析构函数释放资源。所以智能指针的作用原理就是**在函数结束时自动释放内存空间，不需要手动释放内存空间**。
 
 
 
-**shared_ptr**
+#### **shared_ptr**
 
 采用**引用计数器**的方法，允许多个智能指针指向同一个对象，但是多个指针指向同一个资源不能被释放多次，因此使用计数机制表明资源被几个指针共享，使用**拷贝构造函数和赋值拷贝构造函数**时，引用计数加1。 **shared_ptr 并不是线程安全的**，但 shared_ptr 的**计数是原子操作**实现的，利用 atmoic CAS 指令实现。从share_ptr 的内存模型可以看出，当**引用计数和 weak count 同时为 0** 时，share_ptr 对象才会被最终释放掉。当对 shared_ptr 赋予新值或者被对象被销毁时，引用计数会递减。但特殊情况出现循环引用时，shared_ptr 无法正常释放资源。
 
@@ -4625,7 +4624,7 @@ this指针会因**编译器不同**而有不同的放置位置。可能是**栈�
 
 
 
-**unique_ptr**
+#### **unique_ptr**
 
 **独享所有权的智能指针，资源只能被一个指针占有，该指针不能拷贝构造和赋值。但可以进行移动构造和移动赋值构造（调用 move() 函数），即一个 unique_ptr 对象赋值给另一个 unique_ptr 对象，可以通过该方法进行赋值，转移一个unique_ptr将会把所有权全部从源指针转移给目标指针，源指针被置空；**
 
@@ -4637,7 +4636,7 @@ this指针会因**编译器不同**而有不同的放置位置。可能是**栈�
 
 
 
-**weak_ptr** 
+#### **weak_ptr** 
 
  **weak_ptr 是一种不控制对象生命周期的智能指针**, 它指向一个 shared_ptr 管理的对象。进行该对象的内存管理的是那个强引用的 shared_ptr。weak_ptr只是提供了对管理对象的一个访问手段。weak_ptr 设计的目的是为配合 shared_ptr 而引入的一种智能指针来协助 shared_ptr 工作，它只可以从一个 shared_ptr 或另一个 weak_ptr 对象构造, 它的构造和析构不会引起引用记数的增加或减少。
 
@@ -4647,19 +4646,27 @@ this指针会因**编译器不同**而有不同的放置位置。可能是**栈�
 
 
 
-
-
-
-
-
-
-
-
-**auto_ptr**
+#### **auto_ptr**
 
 - 实现**独占式拥有**的概念，同一时间只能有一个智能指针可以指向该对象；但auto_ptr在C++11中被摒弃，其主要问题在于：
   - 对象所有权的转移，比如在函数传参过程中，对象所有权不会返还，从而存在潜在的内存崩溃问题；
   - 不能指向数组，也不能作为STL容器的成员。
+
+
+
+#### 应用场景:
+
+1. **`shared_ptr`**: 共享所有权的智能指针。
+   - **引用计数**: 用于实现垃圾回收机制，如在循环引用的场景中（但需配合`weak_ptr`使用）。
+   - **共享资源**: 当多个对象需要共享同一资源时。
+   - **STL容器中存储指针**: 当你需要在STL容器中存储指向动态分配对象的指针时。
+2. **`unique_ptr`**: 独占所有权的智能指针。
+   - **资源管理**: 用于管理生命周期内只属于一个所有者的资源。
+   - **工厂模式**: 创建一个对象并返回其所有权。
+   - **RAII(资源获取即初始化)**: 确保动态分配的对象总是被释放。
+3. **`weak_ptr`**: 不拥有对象的智能指针，用来解决`shared_ptr`的循环引用问题。
+   - **缓存**: 当对象可能被外部删除时，但仍需要对其进行访问时。
+   - **观察者模式**: 当观察者需要观察一个主题，但不拥有其所有权时。
 
 ### unique_ptr如何处理资源管理
 
@@ -9056,7 +9063,43 @@ $ objdump -h main.o
 
 
 
-## 静态和动态链接库的建立、区别、应用场景
+## 静态和动态链接库区别、应用场景
+
+### 静态库
+
+- **定义**: 静态库是一个包含了可执行代码的文件，它在程序编译时会被整合到最终的可执行文件中。
+- **文件格式**: 在Windows上通常是`.lib`文件，在Unix/Linux上通常是`.a`文件。
+- **链接**: 当你使用静态库时，库中的代码会被复制到最终的可执行文件中。这意味着一旦程序被编译和链接，它就不再依赖于原始的库文件。
+- 优点:
+  - 不需要在运行时加载，因此启动速度可能更快。
+  - 分发应用程序时不需要附带库文件。
+- 缺点:
+  - 增加了最终可执行文件的大小。
+  - 如果静态库更新，需要重新编译和链接应用程序。
+- **适用场景**: 小型应用，或者对启动速度和运行效率要求很高的场景。
+
+### 动态库
+
+- **定义**: 动态库是在运行时而非编译时被加载的库。
+
+- **文件格式**: 在Windows上是`.dll`文件（Dynamic Link Library），在Unix/Linux上是`.so`文件（Shared Object）。
+
+- **链接**: 动态库在程序运行时被加载。程序与动态库之间通过动态链接来实现，即程序运行时才确定库函数的地址。
+
+- 优点:
+
+  - 可以实现库的热更新，不需要重新编译程序。
+  - 多个程序可以共享同一份库的副本，节省内存。
+  - 可以在不同的版本之间提供向后兼容。
+
+- 缺点:
+
+  - 运行时依赖于库文件，如果库文件不可用，程序可能运行失败。
+  - 启动时可能需要额外的时间来加载库。
+
+- **适用场景**: 大型应用，或者需要频繁更新库文件的场景。
+
+  
 
 **静态和动态链接库的建立**
 
@@ -9108,7 +9151,8 @@ $ gcc -shared test1.o test2.o -o libtest.so  # 生成动态库
 3. 静态库是在编译时加载，动态库是在运行时加载。
 4. 生成的静态链接库，Windows下以.lib为后缀，Linux下以.a为后缀。生成的动态链接库，Windows下以.dll为后缀，Linux下以.so为后缀。
 
-1. **静态链接**
+1. **静态链接库**
+   
    - **特点**：静态链接是在编译链接时直接将需要的执行代码拷贝到调用处；
    
      在生成可执行文件的时候(链接阶段)，把所有需要的函数的二进制代码都包含到可执行文件中去。因此，链接器需要知道参与链接的目标文件需要哪些函数，同时也要知道每个目标文件都能提供什么函数，这样链接器才能知道是不是每个目标文件所需要的函数都能正确地链接。如果某个目标文件需要的函数在参与链接的目标文件中找不到的话，链接器就报错了。目标文件中有两个重要的接口来提供这些信息：一个是符号表，另外一个是重定位表。
@@ -9117,7 +9161,8 @@ $ gcc -shared test1.o test2.o -o libtest.so  # 生成动态库
    
    - **缺点**：程序体积会相对大一些；如果静态库有更新的话，所有可执行文件都得**重新链接**才能用上新的静态库。
    
-2. **动态链接**
+2. **动态链接库**
+   
    - **特点：** 在编译的时候不直接拷贝可执行代码，而是通过记录一系列符号和参数，在程序运行或加载时将这些信息传递给操作系统，操作系统负责将需要的动态库加载到内存中，然后程序在运行到指定的代码时，去共享执行内存中已经加载的动态库可执行代码，最终达到运行时连接的目的。
    - **优点：** 多个程序可以共享同一段代码，而不需要在磁盘上存储多个拷贝。
    - **缺点：** 由于是运行时加载，可能会影响程序的前期执行性能。
@@ -9180,83 +9225,234 @@ c++一般情况下的联编是静态联编，当涉及到虚函数的时候就�
 
 
 
-
-
-## 调试流程
-
-### 有哪些引起程序崩溃的原因？如何定位？
-
-> 引起程序崩溃的原因
-
-1. 数组越界
-2. 访问非法指针（野指针，或者在用户空间访问了内核空间的指针）
-3. 堆栈溢出
-4. 除数为0
-
-**定位的话使用gdb调试即可**
-
-
-
-### 简述 GDB 常见的调试命令，什么是条件断点，多进程下如何调试？
+## GDB调试
 
 **GDB调试**：gdb调试的是可执行文件，在gcc编译时加入 -g ，告诉gcc在编译时加入调试信息，这样gdb才能调试这个被编译的文件 gcc -g tesst.c -o test
 
-**GDB命令格式：**
+### **GDB命令**
 
-1. quit：退出gdb，结束调试
+- 启动gdb  -g表示调试、quit：退出gdb，结束调试
 
-2. list：查看程序源代码
+- list查看代码，默认查看10行
 
-   list 5，10：显示5到10行的代码
+- list 5，10：显示5到10行的代码
 
-   list test.c:5, 10: 显示源文件5到10行的代码，在调试多个文件时使用
+  list test.c:5, 10: 显示源文件5到10行的代码，在调试多个文件时使用
 
-   list get_sum: 显示get_sum函数周围的代码
+  list get_sum: 显示get_sum函数周围的代码
 
-   list test.c get_sum: 显示源文件get_sum函数周围的代码，在调试多个文件时使用
+  list test.c get_sum: 显示源文件get_sum函数周围的代码，在调试多个文件时使用
 
-3. reverse-search：字符串用来从当前行向前查找第一个匹配的字符串
+- run(或者写成r)，没有断点就运行到结束，有断点就运行到断点处
 
-4. run：程序开始执行
+- start：程序从`main`函数的起始位置停下，开始逐步调试。
 
-5. help list/all：查看帮助信息
+- break(b)，设置断点
 
-6. break：设置断点
+- info break：查看断点信息
 
-   break 7：在第七行设置断点
+- delete：删除断点
 
-   break get_sum：以函数名设置断点
+- continue、step、next命令
 
-   break 行号或者函数名 if 条件：以条件表达式设置断点
+  1. continue：继续执行程序，直到遇到下一个断点或者结束
+  2. next：单步执行，遇到函数时会跳过函数，不进入函数体内部
+  3. step：单步执行程序，但遇到函数会进入到函数内部
 
-7. watch 条件表达式：条件表达式发生改变时程序就会停下来
+- until：结束一个循环体循环
 
-8. next：继续执行下一条语句 ，会把函数当作一条语句执行
-
-9. step：继续执行下一条语句，会跟踪进入函数，一次一条的执行函数内的代码
+- print：显示变量或者表达式的值
 
 **条件断点：**break if 条件 以条件表达式设置断点
 
-**多进程下如何调试：**
-
-- 用set follow-fork-mode child **调试子进程**
-- 或者set follow-fork-mode parent **调试父进程**
 
 
+### GDB启动步骤
 
-### 说一下如何使用gdb调试段错误？
+1. **编译程序**: 要使用GDB调试程序，首先需要使用编译器（如GCC）编译源代码，通常需要在编译过程中包含调试信息（例如，使用`-g`选项），以便GDB能够理解源代码和机器代码之间的映射关系。
 
-1. 在编译过程中，需要加入 `-g` 选项，来加入 gdb 调试的功能
-2. 使用 gdb 来运行发生段错误的程序
-3. 进入 gdb 调试界面后，输入 `run` 命令运行
-4. 段错误一般都是操作系统发出了 `SIGSEGV` 信号，导致程序中断
-5. 使用 `backtrace` 命令查看程序的函数调用栈
-6. 定位出现问题的堆栈帧，使用 `frame x` 命令切换到指定的堆栈帧 x，查看具体的代码，使用 `print` 命令查看具体参数是否存在问题。
-7. 为发生段错误的前面代码添加断点，从断点开始使用 `next` 命令单步执行，最终定位段错误的问题区域。
+2. **启动GDB**: 在终端中运行GDB，然后通过命令行将待调试的程序作为参数传递给GDB。例如，使用以下命令启动GDB并调试一个名为`my_program`的程序：
+
+   ```
+   gdb my_program
+   ```
+
+3. **设置断点**: GDB允许您在程序中设置断点，以在特定位置停止程序的执行。您可以使用`break`命令设置断点，指定要在哪个源代码行或函数中停止。例如：
+
+   ```
+   break main
+   ```
+
+4. **运行程序**: 使用`run`命令开始执行程序，直到遇到设置的断点或程序结束。例如：
+
+   ```
+   run
+   ```
+
+5. **调试控制**: 一旦程序停止，您可以使用各种GDB命令来检查程序状态。一些常用的命令包括：
+
+   - `step`：逐行执行程序，进入函数调用。
+   - `next`：逐行执行程序，跳过函数调用。
+   - `continue`：继续执行程序，直到下一个断点。
+   - `print`：用于查看变量的值。
+   - `backtrace`：显示函数调用堆栈。
+
+6. **观察程序状态**: 使用GDB，您可以查看程序的变量、寄存器状态、内存内容等，以帮助诊断问题。
+
+7. **修改程序状态**: 在某些情况下，您可以使用GDB来修改程序的状态，例如，更改变量的值，然后继续执行程序。
+
+8. **终止调试**: 调试完成后，您可以使用`quit`命令退出GDB。
+
+9. 
+
+### 多线程调试
+
+#### 启动多线程程序
+
+使用`-g`选项来编译你的程序，以包含调试信息。
+
+```
+g++ -g -o myprogram myprogram.cpp -lpthread
+```
+
+使用GDB来启动你的程序：
+
+```
+gdb ./myprogram
+```
+
+#### GDB中的多线程调试命令
+
+1. **`info threads`**: 列出所有线程。
+2. **`thread 线程号`**: 切换到指定线程。
+3. **`break 函数名 if 线程号==值`**: 在指定线程上设置条件断点。
+4. **`set scheduler-locking on/off/step`**:
+   - `on`: 当你在一个线程上单步执行时，所有其他线程都将被冻结。
+   - `off`: 所有线程都将独立运行（默认设置）。
+   - `step`: 当你在一个线程上单步执行时，其他线程可以运行，直到控制权返回给GDB。
+5. **`thread apply all 命令`**: 在所有线程上执行GDB命令。
+
+#### 示例
+
+假设你有一个名为`myprogram`的多线程程序，你想在`main`函数中的第10行设置一个断点，并仅在第二个线程上停止。你可以使用以下GDB命令来实现这一点：
+
+```
+gdb ./myprogram
+(gdb) break main if thread_num==2
+(gdb) run
+```
+
+当你的程序在断点处停止时，你可以使用`info threads`查看所有线程，然后使用`thread 线程号`切换到你感兴趣的线程。
+
+
+
+多线程调试
+
+- info threads
+
+  查看所有线程，默认分支是主线程
+
+- thread id
+
+  切换线程
+
+- bt
+
+  查看每个线程的栈帧然后设置断点
+
+- thread apply （n或all） 命令
+
+  使用thread apply来让一个或是多个线程执行指定的命令。例如让所有的线程打印调用栈信息。
+
+- set scheduler-locking on
+
+  锁定只有当前的线程能够执行
+
+<img src="https://cdn.jsdelivr.net/gh/luogou/cloudimg/data/202203151449773.png" alt="这里写图片描述" style="zoom: 80%;float:left" />
+
+
+
+普通调试
+
+- step和next的区别？
+
+​		next会直接执行到下一句 ,step会进入函数体内部执行
+
+- list
+
+​		查看源码
+
+- set
+
+  设置变量值
+
+- backtrace 
+
+  查看函数调用的栈帧关系
+
+- framework
+
+  切换函数栈帧
+
+- info
+
+  查看函数内部局部变量
+
+
+
+## 使用gdb调试段错误
+
+段错误（Segmentation Fault）通常是由于程序试图访问它没有权限访问的内存区域时引发的。使用GDB可以帮助你找到引发段错误的代码位置，并分析导致错误的原因。以下是使用GDB调试段错误的一般步骤：
+
+1. **编译代码**：在编译你的程序时，需要使用`-g`选项来生成调试信息。例如：
+
+   ```
+   gcc -g -o my_program my_program.c
+   ```
+
+2. **运行GDB**：在命令行中运行GDB，并将你的程序作为参数传递给它。
+
+   ```
+   gdb ./my_program
+   ```
+
+3. **运行程序**：在GDB中，使用`run`命令运行你的程序。你可以在`run`命令后面添加任何必要的命令行参数。
+
+   ```
+   (gdb) run [command line arguments]
+   ```
+
+4. **查找段错误位置**：如果程序中发生了段错误，GDB将停止执行，并显示引发错误的代码行。例如：
+
+   ```shell
+   Program received signal SIGSEGV, Segmentation fault.
+   0x000000000040059d in main () at my_program.c:10
+   10        *ptr = 42;
+   ```
+
+   在这个示例中，段错误发生在`my_program.c`文件的第10行。
+
+5. **分析错误**：使用GDB的各种命令来分析导致段错误的原因。常用的GDB命令包括：
+
+   - `list`：显示当前代码位置的源代码。
+   - `backtrace`或`bt`：显示函数调用堆栈。
+   - `frame`：选择当前堆栈帧。
+   - `info locals`：显示当前函数的局部变量。
+   - `info registers`：显示CPU寄存器的内容。
+   - `print`或`p`：打印变量的值或表达式的结果。
+   - `x`：检查内存地址的内容。
+
+   使用这些命令，你可以查看变量的值，检查内存地址的内容，以及执行其他操作来帮助你确定为什么发生了段错误。
+
+6. **修复错误**：一旦你找到了引发段错误的原因，你就可以退出GDB（使用`quit`命令）并修复你的代码。
+
+7. **重新编译和测试**：修复错误后，重新编译你的程序并再次运行GDB来确保错误已经被解决。
 
 
 
 ### gcc常用参数
+
+**gcc的全称是GNU Compiler Collection，它是一个能够编译多种语言的编译器。**
 
 - -v/--version：查看gcc的版本
 - -I：编译的时候指定头文件路径，不然头文件找不到
@@ -9266,33 +9462,38 @@ c++一般情况下的联编是静态联编，当涉及到虚函数的时候就�
 - -wall：添加警告信息
 - -On：-O是优化代码，n是优化级别：1，2，3
 
+### gcc工作流程
+
+- 预处理（--E）
+  - 宏替换
+  - 头文件展开
+  - 去掉注释
+  - .c文件变成了.i文件（本质上还是.c文件，只不过#include中的程序给链接进去）
+- 编译（--S）
+  - gcc调用不同语言的编译器
+  - .i文件编程.s（汇编文件）
+  - 生成汇编文件
+
+- 汇编（-c）
+  - .s文件转化成.o文件
+  - 翻译成机器语言指令
+  - 二进制文件
+- 链接
+  - .o文件变成可执行文件，一般不加后缀
+
+> ![img](https://cdn.jsdelivr.net/gh/luogou/cloudimg/data/202201241320667.jpeg)
+>
+> **预处理**实际上是将头文件、宏进行展开。
+>
+> **编译阶段**gcc调用不同语言的编译器。gcc实际上是个工具链，在编译程序的过程中调用不同的工具。
+>
+> **汇编阶段**gcc调用汇编器进行汇编。汇编语言是一种低级语言，在不同的设备中对应着不同的机器语言指令，一种汇编语言专用于某种计算机体系结构，可移植性比较差。通过相应的汇编程序可以将汇编语言转换成可执行的机器代码这一过程叫做汇编过程。汇编器生成的是可重定位的目标文件，在源程序中地址是从0开始的，这是一个相对地址，而程序真正在内存中运行时的地址肯定不是从0开始的，而且在编写源代码的时候也不能知道程序的绝对地址，所以**重定位**能够将源代码的代码、变量等定位为内存具体地址。
+>
+> **链接过程**会将程序所需要的目标文件进行链接成可执行文件。
 
 
 
 
-执行过程
-
-创建子进程
-
-<img src="https://pic1.zhimg.com/80/v2-8bc2eb74785e0486e6c67482030243d0_720w.jpg" alt="img"  />
-
-当通过 shell 执行 C++ 可执行程序后，系统会拷贝当前进程空间的内容，创建子进程空间。然后会清空子进程的空间（包括原动态库、数据段、代码段以及堆栈），只保留环境变量部分。之后内核可以调用 loader() 程序将可执行文件内容加载到子进程内存空间。
-
-加载可执行程序
-
-loader 的作用是将可执行程序内容移动到虚拟内存相应地址当中。loader 根据每一个部分(section) 的读写属性将其归入不同的段（segment）内，然后将各个段加载到虚拟内存中。
-
-用 readelf --segments regularBuild 命令可以查看可执行程序 regularBuild的各个段的组成。可见，该程序由九个段组成，其中类型为 LOAD的段是运行时需要加载的段。权限为RE（可读可执行）的 LOAD 段为程序的代码段，权限为 RW (可读可写) 的 LOAD 段为程序的数据段。
-
-loader 会根据 INTERP 段的内容加载动态链接库。若要完全避免动态链接（包括C++ 标准库）过程，可以用 -static关键字编译：
-
- g++ -static main.c -o staticBuild 。
-
-loader 通过可执行程序的头部信息获得各个段的长度和虚拟地址，将其赋值到一系列结构体对象中，再根据这些信息和内存管理单元（MMU）将各个段加载到物理内存中。
-
-main() 函数的执行
-
-当然 `main()` 执行之前还需要进行其他操作。
 
 
 
@@ -9476,63 +9677,348 @@ MyString& MyString::operator= (const MyString& str) {
 
 # 设计模式
 
-## 6⼤设计原则、分三类、⼏种设计模式：
+## 6⼤设计原则、设计模式分三类、⼏种
 
 **6⼤设计原则：**
 
-单⼀职责原则：就⼀个类⽽⾔，应该仅有⼀个引起它变化的原因。
+- 单⼀职责原则：就⼀个类⽽⾔，应该仅有⼀个引起它变化的原因。
 
-开放封闭原则：软件实体可以扩展，但是不可修改。即⾯对需求，对程序的改动可以通过增加代码来完成，但是不能改动现有的代码。
+- 开放封闭原则：软件实体可以扩展，但是不可修改。即⾯对需求，对程序的改动可以通过增加代码来完成，但是不能改动现有的代码。
 
-⾥⽒代换原则：⼀个软件实体如果使⽤的是⼀个基类，那么⼀定适⽤于其派⽣类。即在软件中，把基类替换成派⽣类，程序的⾏为没有变化。
+- ⾥⽒代换原则：⼀个软件实体如果使⽤的是⼀个基类，那么⼀定适⽤于其派⽣类。即在软件中，把基类替换成派⽣类，程序的⾏为没有变化。
 
-依赖倒转原则：抽象不应该依赖细节，细节应该依赖抽象。即针对接⼝编程，不要对实现编程。
+- 依赖倒转原则：抽象不应该依赖细节，细节应该依赖抽象。即针对接⼝编程，不要对实现编程。
 
-迪⽶特原则：如果两个类不直接通信，那么这两个类就不应当发⽣直接的相互作⽤。如果⼀个类需要调⽤另⼀个类的某个⽅法的话，可以通过第三个类转发这个调⽤。
+- 迪⽶特原则：如果两个类不直接通信，那么这两个类就不应当发⽣直接的相互作⽤。如果⼀个类需要调⽤另⼀个类的某个⽅法的话，可以通过第三个类转发这个调⽤。
 
-接⼝隔离原则：每个接⼝中不存在派⽣类⽤不到却必须实现的⽅法，如果不然，就要将接⼝拆分，使⽤多个隔离的接⼝。
+- 接⼝隔离原则：每个接⼝中不存在派⽣类⽤不到却必须实现的⽅法，如果不然，就要将接⼝拆分，使⽤多个隔离的接⼝。
 
-
-
-**单⼀职责原则和接⼝隔离原则的区别**
-
-单⼀职责原则注重的是职责；⽽接⼝隔离原则注重对接⼝依赖的隔离。
-
-单⼀职责原则主要是约束类，其次才是接⼝和⽅法，它针对的是程序中的实现和细节； ⽽接⼝隔离原则主要
-
-约束接⼝，主要针对抽象，针对程序整体框架的构建。
 
 
 
 **设计模式分为三类：**
 
-创造型模式：单例模式、⼯⼚模式、建造者模式、原型模式
-
-结构型模式：适配器模式、桥接模式、外观模式、组合模式、装饰模式、享元模式、代理模式
-
-⾏为型模式：责任链模式、命令模式、解释器模式、迭代器模式、中介者模式、备忘录模式、观察者模式、状态模
-
-式、策略模式、模板⽅法模式、访问者模式。
+- **创造型模式**：单例模式、⼯⼚模式、建造者模式、原型模式
+- **结构型模式**：适配器模式、桥接模式、外观模式、组合模式、装饰模式、享元模式、代理模式
+- **⾏为型模式**：责任链模式、命令模式、解释器模式、迭代器模式、中介者模式、备忘录模式、观察者模式、状态模式、策略模式、模板⽅法模式、访问者模式。
 
 
 
-## ⼏种设计模式：
+**⼏种设计模式：**
 
-单例模式：保证⼀个类仅有⼀个实例，并提供⼀个访问它的全局访问点。
-
-⼯⼚模式：包括简单⼯⼚模式、抽象⼯⼚模式、⼯⼚⽅法模式
-
-简单⼯⼚模式：主要⽤于创建对象。⽤⼀个⼯⼚来根据输⼊的条件产⽣不同的类，然后根据不同类的虚函数得到不同的结果。
-
-抽象⼯⼚模式：定义了⼀个创建⼀系列相关或相互依赖的接⼝，⽽⽆需指定他们的具体类。
-
-观察者模式：定义了⼀种⼀对多的关系，让多个观察对象同时监听⼀个主题对象，主题对象发⽣变化时，会通知所有的观察者，使他们能够更新⾃⼰。
-
-装饰模式：动态地给⼀个对象添加⼀些额外的职责，就增加功能来说，装饰模式⽐⽣成派⽣类更为灵活
+- **单例模式**确保一个类只有一个实例存在，并提供一个全局访问点来获取这个实例。
+- **工厂模式**包括三种形式：简单工厂模式、抽象工厂模式和工厂方法模式。
+- **简单工厂模式**主要用于对象的创建。它使用一个工厂类来根据输入的条件创建不同的对象，并通过这些对象的虚函数获得不同的结果。
+- **抽象工厂模式**定义了一个创建一系列相关或相互依赖对象的接口，但无需指定它们具体的类。
+- **观察者模式**定义了一种一对多的关系，让多个观察者对象同时监听一个主题对象。当主题对象状态发生变化时，它会通知所有观察者，使他们能够更新自己。
+- **装饰模式**动态地给一个对象添加一些额外的职责。相比生成子类，装饰模式提供了一种更为灵活的方式来增加对象的功能。
 
 
-## 单例模式介绍
-Singleton 模式就是一个类只创建一个唯一的对象，即一次创建多次使用。
+
+## 单例模式注意点、优点
+
+**注意点：**
+
+- 全局只有一个实例，`static` 特性，同时禁止用户自己声明并定义实例（将构造函数和赋值运算符设为 `private` ）
+- 线程安全
+- 用户通过接口获取示例：使用 `static` 类成员函数
+- 客户调⽤类的单个实例只允许使⽤⼀个公共访问点，除了该访问点之外不允许通过其它⽅式访问该实例（就是共有的静态⽅法）
+
+**优点：**
+
+单例模式只创建一个实例，并提供一个对外获取实例的接口，因为只创建一个实例所以它可以节省资源，而且在多线程条件下可以避免竞态条件。
+
+
+
+
+
+**饿汉模式（代码）：**
+
+```c++
+#include <iostream>
+#include <algorithm>
+using namespace std;
+class SingleInstance {
+public:
+    // 静态成员函数，用于获取单例实例
+    static SingleInstance* GetInstance() {
+        // 在第一次调用时创建唯一实例
+        static SingleInstance instance;
+        return &instance;
+    }
+    // 析构函数（可省略，由于没有资源管理，所以可以不实现）
+    ~SingleInstance() {};
+private:
+    // 构造函数私有化，防止外部创建对象
+    SingleInstance() {
+        std::cout << "SingleInstance() 饿汉" << std::endl;
+    }
+    // 阻止拷贝构造函数和赋值操作符
+    SingleInstance(const SingleInstance& other) {};
+    SingleInstance& operator=(const SingleInstance& other) { return *this; }
+};
+int main() {
+    // 通过静态成员函数获取单例实例
+    SingleInstance* ins = SingleInstance::GetInstance();
+    return 0;
+}
+// 输出 SingleInstance() 饿汉
+这个代码中，SingleInstance类的构造函数是私有的，这意味着无法在类外部创建实例。通过静态成员函数GetInstance返回单例实例，确保只有一个实例被创建。饿汉式单例模式在程序启动时就创建了实例，因此被称为"饿汉式"，而不是在第一次使用时才创建（懒汉式）。
+```
+
+**懒汉模式代码（线程安全需要加锁）：**
+
+```C++
+#include <pthread.h>
+#include <iostream>
+#include <algorithm>
+using namespace std;
+class SingleInstance {
+public:
+    // 获取单例实例的静态成员函数
+    static SingleInstance* GetInstance() {
+        // 检查实例是否已经创建
+        if (ins == nullptr) {
+            // 使用互斥锁确保多线程环境下的安全性
+            pthread_mutex_lock(&mutex);
+            // 再次检查实例是否已经创建，因为其他线程可能在等待锁的时候已经创建了实例
+            if (ins == nullptr) {
+                ins = new SingleInstance();
+            }
+            pthread_mutex_unlock(&mutex);
+        }
+        return ins;
+    }
+    // 析构函数（可省略，由于没有资源管理，所以可以不实现）
+    ~SingleInstance() {};
+private:
+    // 构造函数私有化，防止外部创建对象
+    SingleInstance() {
+        std::cout << "SingleInstance() 懒汉" << std::endl;
+    }
+    // 阻止拷贝构造函数和赋值操作符
+    SingleInstance(const SingleInstance& other) {};
+    SingleInstance& operator=(const SingleInstance& other) { return *this; }
+    // 静态成员变量，用于保存唯一实例
+    static SingleInstance* ins;
+    // 互斥锁，用于保证多线程环境下的安全性
+    static pthread_mutex_t mutex;
+};
+// 静态成员变量初始化
+SingleInstance* SingleInstance::ins = nullptr;
+pthread_mutex_t SingleInstance::mutex;
+int main() {
+    // 通过静态成员函数获取单例实例
+    SingleInstance* ins = SingleInstance::GetInstance();
+    // 删除单例实例（不是必需的，可以省略，因为操作系统会在程序结束时回收内存）
+    delete ins;
+    return 0;
+}
+// 输出 SingleInstance() 懒汉
+这个代码中，SingleInstance类的构造函数是私有的，这意味着无法在类外部创建实例。通过静态成员函数GetInstance返回单例实例，确保只有一个实例被创建。互斥锁用于在多线程环境下确保只有一个线程能够创建实例，避免了多线程竞争条件。懒汉式单例模式在第一次使用时才创建实例。
+```
+
+
+
+使用智能指针和锁（安全单例模式）
+
+ 智能指针和双重锁机制实现的**线程安全单例模式**
+
+- 使用 `mutex` 是为了避免多个线程同时获取单例，造成实例化出两个单例对象。
+- 使用智能指针是为了避免将释放单例对象的操作交给用户，容易造成内存泄漏。
+- 使用双检锁，因为第一次判断通过后才加锁（如果没有第二次判断的话，第一次判断后，另一线程创建出示例，那么会实例化出两个单例对象）
+
+```c++
+#include <iostream>
+#include <memory>
+#include <mutex>
+class Singleton {
+public:
+    // 使用智能指针作为单例指针类型
+    using Ptr = std::shared_ptr<Singleton>;
+    // 析构函数，用于在单例销毁时输出消息
+    ~Singleton() {
+        std::cout << "destructor called!" << std::endl;
+    }
+    // 删除拷贝构造函数和赋值操作符，防止复制和赋值
+    Singleton(const Singleton&) = delete;
+    Singleton& operator=(const Singleton&) = delete;
+    // 获取单例实例的静态成员函数
+    static Ptr getInstance() {
+        // 双重锁检查
+        if (m_pInstance == nullptr) {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            if (m_pInstance == nullptr) {
+                m_pInstance = Ptr(new Singleton); // 创建单例实例
+            }
+        }
+        return m_pInstance;
+    }
+private:
+    // 构造函数私有化，防止外部创建实例
+    Singleton() {
+        std::cout << "constructor called!" << std::endl;
+    }
+private:
+    // 静态成员变量，用于保存唯一实例
+    static Ptr m_pInstance;
+    // 互斥锁，用于保证多线程环境下的安全性
+    static std::mutex m_mutex;
+};
+// 初始化静态成员变量
+Singleton::Ptr Singleton::m_pInstance = nullptr;
+std::mutex Singleton::m_mutex;
+int main() {
+    // 通过静态成员函数获取单例实例
+    Singleton::Ptr instance = Singleton::getInstance();
+    return 0;
+}
+```
+
+
+
+### 局部静态变量（面试代码）
+
+函数的静态变量，如果当变量在初始化的时候，并发同时进入声明语句，并发线程将会阻塞等待初始化结束。从而保证了线程安全。
+
+```c++
+#include <iostream>
+class Singleton {
+public:
+    // 析构函数，用于在单例销毁时输出消息
+    ~Singleton() {
+        std::cout << "destructor called!" << std::endl;
+    }
+    // 删除拷贝构造函数和赋值操作符，防止复制和赋值
+    Singleton(const Singleton&) = delete;
+    Singleton& operator=(const Singleton&) = delete;
+    // 获取单例实例的静态成员函数
+    static Singleton& getInstance() {
+        // 在首次调用时创建唯一实例，利用了C++11的线程安全性保证
+        static Singleton instance;
+        return instance;
+    }
+private:
+    // 构造函数私有化，防止外部创建实例
+    Singleton() {
+        std::cout << "constructor called!" << std::endl;
+    }
+};
+int main() {
+    // 通过静态成员函数获取单例实例
+    Singleton& instance = Singleton::getInstance();
+    return 0;
+}
+```
+
+
+
+**懒汉式局部静态变量提前销毁有什么办法（销毁后不会再创建了）**
+
+设置一个bool标志位，然后把实例设置为NULL，然后获取实例的代码会先检查实例是不是NULL并且标志位是不是true，如果是的话直接返回NULL
+
+
+
+
+
+### 懒汉模式线程安全要两次判空
+
+懒汉式单例模式中的“双重检查锁定”（double-checked locking）是一种多线程编程技巧，用来减少同步开销。
+
+懒汉式单例模式是指在第一次使用时实例化单例对象，而不是在程序启动时。因为创建对象可能是一个耗时操作，所以如果该单例对象可能不被用到，使用懒汉式可以避免不必要的性能开销。
+
+然而，这种方法在多线程环境中可能会导致问题。**如果多个线程同时尝试创建单例对象，可能会导致对象被多次创建，破坏单例模式的初衷。**
+
+双重检查锁定是解决这个问题的一种方法。它的步骤是：
+
+1. **首次检查**：如果单例对象已经创建，那么直接返回。这样可以避免已经创建了对象的情况下还要获取锁，从而减少了不必要的开销。
+2. **获取锁**：如果对象还未创建，那么获取锁，防止其他线程同时创建对象。
+3. **再次检查**：在获取锁之后，再次检查对象是否已经被创建。**这是因为在当前线程等待锁的期间，可能有其他线程已经创建了对象。如果已经创建，直接返回。**
+4. **创建对象**：如果对象还未被创建，那么在锁的保护下创建对象。
+
+这种方法可以保证单例对象在多线程环境中只被创建一次，并且在对象已经被创建后避免了获取锁的开销。然而，需要注意的是，这种方法在某些内存模型（例如Java的旧内存模型）中可能会因为重排序问题导致错误，需要使用volatile关键字或者其他方法来防止重排序。
+
+
+
+
+
+### **如何保证单例模式的线程安全**
+
+C11之前双检测、C11后static
+
+ 智能指针和双重锁机制实现的**线程安全单例模式**
+
+
+
+**单例模式中的get方法为什么是static的，可不可以作为成员函数**
+
+static函数可以通过类名直接调用，不需要声明对象
+
+不可以，单例私有化了构造函数，外部不可以声明对象，因此无法调用成员函数get
+
+**单例模式它的主要目标是确保一个类只有一个实例，并提供一个全局访问点到这个实例。**
+
+
+
+**继承单例模式，有哪些需要注意的地方？**
+
+**实现要点：**
+
+- 构造函数需要是 `protected`，这样子类才能继承；
+- 将基类声明为友元，这样才能调用子类的**私有构造函数**。
+- 使用了奇异递归模板模式 CRTP(Curiously recurring template pattern) ，`enable_shared_form_this<T>` 也是用的这个
+
+- 基类实现同前
+
+- 在这里基类的析构函数可以不需要 `virtual` ，因为子类在应用中只会用 `Derived` 类型，保证了析构时和构造时的类型一致
+
+```c++
+template<typename T>
+class Singleton{
+public:
+    static T& getInstance(){
+        static T instance;
+        return instance;
+    }
+ 
+    virtual ~Singleton(){
+        std::cout<<"destructor called!"<<std::endl;
+    }
+ 
+    Singleton(const Singleton&)=delete;
+    Singleton& operator =(const Singleton&)=delete;
+ 
+protected:
+    Singleton(){
+        std::cout<<"constructor called!"<<std::endl;
+    }
+};
+ 
+/********************************************/
+// Example:
+// 1.friend class declaration is requiered!
+// 2.constructor should be private
+ 
+class DerivedSingle : public Singleton<DerivedSingle>{
+    // !!!! attention!!!
+    // needs to be friend in order to
+    // access the private constructor/destructor
+    friend class Singleton<DerivedSingle>;
+ 
+public:
+    DerivedSingle(const DerivedSingle&) = delete;
+    DerivedSingle& operator =(const DerivedSingle&) = delete;
+ 
+private:
+    DerivedSingle() = default;
+};
+```
+
+
+
+## 单例模式
+
+单例模式确保一个类只有一个实例，就是一个类只创建一个唯一的对象，即一次创建多次使用，并提供一个全局访问点来获取这个唯一的实例。
 
 **实现单例模式的步骤：**
 
@@ -9542,11 +10028,89 @@ Singleton 模式就是一个类只创建一个唯一的对象，即一次创建�
 
 3、提供静态对外接口,可以让用户获得单例对象
 
+### 应用场景
 
-**单例分为懒汉式和饿汉式**
+1. **配置管理**: 用于管理和提供全局配置设置，确保整个应用程序中的组件都能访问一致的配置信息。
+2. **日志记录**: 用于全局日志记录，确保整个应用程序中的所有组件都使用同一个日志记录实例。
+3. **数据库连接池**: 用于管理数据库连接，确保系统中存在一个共享的连接池实例。
+4. **线程池**: 用于管理线程资源，提高系统性能。
+5. **缓存管理**: 用于全局缓存管理，确保所有组件都能访问和使用同一个缓存实例。
+6. **资源管理器**: 如字体管理器、图像资源管理器等，确保资源的统一管理和复用。
 
-懒汉式：解决了饿汉式内存浪费问题，但是线程不安全的，可以通过互斥量mutex.lock()和mutex.unlock()来解决
-饿汉式：还没有使用该单例对象，该单例对象就已经被加载到内存了，在对象过多时会造成内存浪费
+### 饿汉模式（线程安全）
+
+- 它在类加载的时候就创建了单例实例。
+- 在最开始的时候静态对象就已经创建完成，**设计⽅法**是类中包含⼀个静态成员指针，该指针指向该类的⼀个对象，提供⼀个公有的静态成员⽅法，返回该对象指针，为了使得对象唯⼀，构造函数设为私有。
+
+
+**特点：**
+
+1. 线程安全：在类初始化阶段创建实例，保证了线程安全。
+2. 占用资源：即使单例没有被使用过，也会占用系统资源。
+3. 获取速度快：实例在类加载时已经创建，获取实例时无需任何额外操作。
+
+```c++
+class Singleton {
+private:
+    static Singleton instance; 
+    // 声明一个静态的单例对象
+    Singleton() { }             
+    // 私有构造函数，防止外部直接创建对象
+public:
+    Singleton(const Singleton&) = delete;             
+    // 删除拷贝构造函数
+    Singleton& operator=(const Singleton&) = delete;  
+    // 删除拷贝赋值操作符
+    static Singleton& getInstance() {                 
+        // 提供一个获取单例对象的静态函数
+        return instance;                              
+        // 返回单例对象的引用
+    }
+};
+Singleton Singleton::instance; // 在类外初始化静态单例对象
+```
+
+### 懒汉模式(线程不安全)
+
+懒汉模式在第一次使用时才创建单例实例。
+
+特点
+
+1. 延迟加载：只有在真正需要使用单例的时候才创建实例，节省资源。
+2. 需要额外的处理来保证线程安全。
+3. 第一次获取实例时会稍慢，因为需要进行实例创建的操作。
+
+为了使懒汉模式线程安全，可以**添加锁机制**，但这会增加获取实例时的开销。另一种线程安全的实现方法是**使用“双检锁”**或者使用C++11以后的`std::call_once`。
+
+```c++
+class Singleton {
+private:
+    static Singleton* instance;  
+    // 声明一个指向单例对象的静态指针，并初始化为nullptr
+    Singleton() { }  
+    // 私有构造函数，防止外部直接创建对象
+public:
+    Singleton(const Singleton&) = delete;  
+    // 删除拷贝构造函数，防止复制单例对象
+    Singleton& operator=(const Singleton&) = delete;  
+    // 删除拷贝赋值操作符，防止复制单例对象
+    static Singleton* getInstance() {  
+        // 提供一个获取单例对象的静态函数
+        if (instance == nullptr) {  
+            // 如果单例对象还没有被创建
+            instance = new Singleton();  
+            // 创建单例对象
+        }
+        return instance;  // 返回单例对象的指针
+    }
+};
+Singleton* Singleton::instance = nullptr;  
+// 在类外初始化静态指针，设置为nullptr
+```
+
+
+
+
 
 **总结：**
 
@@ -9637,313 +10201,6 @@ int main()
 
 
 
-## 单例模式注意点、优点、饿汉和懒汉代码
-
-**注意点：**
-
-- 全局只有一个实例，`static` 特性，同时禁止用户自己声明并定义实例（将构造函数和赋值运算符设为 `private` ）
-- 线程安全
-- 用户通过接口获取示例：使用 `static` 类成员函数
-- 客户调⽤类的单个实例只允许使⽤⼀个公共访问点，除了该访问点之外不允许通过其它⽅式访问该实例（就是共有的静态⽅法）
-
-**优点：**
-
-单例模式只创建一个实例，并提供一个对外获取实例的接口，因为只创建一个实例所以它可以节省资源，而且在多线程条件下可以避免竞态条件。
-
-
-
-**懒汉和饿汉：**
-
-饿汉：饿了就饥不择⻝了，所以在单例类定义的时候就进⾏实例化。
-
-懒汉：顾名思义，不到万不得已就不会去实例化类，也就是在第⼀次⽤到的类实例的时候才会去实例化。
-
-**饿汉模式（线程安全）：**
-
-在最开始的时候静态对象就已经创建完成，设计⽅法是类中包含⼀个静态成员指针，该指针指向该类的⼀个对象，
-
-提供⼀个公有的静态成员⽅法，返回该对象指针，为了使得对象唯⼀，构造函数设为私有。
-
-```c++
-#include <iostream>
-#include <algorithm>
-using namespace std;
-class SingleInstance {
-public:
-    // 静态成员函数，用于获取单例实例
-    static SingleInstance* GetInstance() {
-        // 在第一次调用时创建唯一实例
-        static SingleInstance instance;
-        return &instance;
-    }
-    // 析构函数（可省略，由于没有资源管理，所以可以不实现）
-    ~SingleInstance() {};
-private:
-    // 构造函数私有化，防止外部创建对象
-    SingleInstance() {
-        std::cout << "SingleInstance() 饿汉" << std::endl;
-    }
-    // 阻止拷贝构造函数和赋值操作符
-    SingleInstance(const SingleInstance& other) {};
-    SingleInstance& operator=(const SingleInstance& other) { return *this; }
-};
-int main() {
-    // 通过静态成员函数获取单例实例
-    SingleInstance* ins = SingleInstance::GetInstance();
-    return 0;
-}
-// 输出 SingleInstance() 饿汉
-这个代码中，SingleInstance类的构造函数是私有的，这意味着无法在类外部创建实例。通过静态成员函数GetInstance返回单例实例，确保只有一个实例被创建。饿汉式单例模式在程序启动时就创建了实例，因此被称为"饿汉式"，而不是在第一次使用时才创建（懒汉式）。
-```
-
-**懒汉模式（线程安全需要加锁）：**
-
-尽可能的晚的创建这个对象的实例，即在单例类第⼀次被引⽤的时候就将⾃⼰初始化，C++ 很多地⽅都有类型的思想，⽐如写时拷⻉，晚绑定等
-
-```C++
-#include <pthread.h>
-#include <iostream>
-#include <algorithm>
-using namespace std;
-class SingleInstance {
-public:
-    // 获取单例实例的静态成员函数
-    static SingleInstance* GetInstance() {
-        // 检查实例是否已经创建
-        if (ins == nullptr) {
-            // 使用互斥锁确保多线程环境下的安全性
-            pthread_mutex_lock(&mutex);
-            // 再次检查实例是否已经创建，因为其他线程可能在等待锁的时候已经创建了实例
-            if (ins == nullptr) {
-                ins = new SingleInstance();
-            }
-            pthread_mutex_unlock(&mutex);
-        }
-        return ins;
-    }
-    // 析构函数（可省略，由于没有资源管理，所以可以不实现）
-    ~SingleInstance() {};
-private:
-    // 构造函数私有化，防止外部创建对象
-    SingleInstance() {
-        std::cout << "SingleInstance() 懒汉" << std::endl;
-    }
-    // 阻止拷贝构造函数和赋值操作符
-    SingleInstance(const SingleInstance& other) {};
-    SingleInstance& operator=(const SingleInstance& other) { return *this; }
-    // 静态成员变量，用于保存唯一实例
-    static SingleInstance* ins;
-    // 互斥锁，用于保证多线程环境下的安全性
-    static pthread_mutex_t mutex;
-};
-// 静态成员变量初始化
-SingleInstance* SingleInstance::ins = nullptr;
-pthread_mutex_t SingleInstance::mutex;
-int main() {
-    // 通过静态成员函数获取单例实例
-    SingleInstance* ins = SingleInstance::GetInstance();
-    // 删除单例实例（不是必需的，可以省略，因为操作系统会在程序结束时回收内存）
-    delete ins;
-    return 0;
-}
-// 输出 SingleInstance() 懒汉
-这个代码中，SingleInstance类的构造函数是私有的，这意味着无法在类外部创建实例。通过静态成员函数GetInstance返回单例实例，确保只有一个实例被创建。互斥锁用于在多线程环境下确保只有一个线程能够创建实例，避免了多线程竞争条件。懒汉式单例模式在第一次使用时才创建实例。
-```
-
-
-
-### 使用智能指针和锁（安全单例模式）
-
- 智能指针和双重锁机制实现的**线程安全单例模式**
-
-- 使用 `mutex` 是为了避免多个线程同时获取单例，造成实例化出两个单例对象。
-- 使用智能指针是为了避免将释放单例对象的操作交给用户，容易造成内存泄漏。
-- 使用双检锁，因为第一次判断通过后才加锁（如果没有第二次判断的话，第一次判断后，另一线程创建出示例，那么会实例化出两个单例对象）
-
-```c++
-#include <iostream>
-#include <memory>
-#include <mutex>
-class Singleton {
-public:
-    // 使用智能指针作为单例指针类型
-    using Ptr = std::shared_ptr<Singleton>;
-    // 析构函数，用于在单例销毁时输出消息
-    ~Singleton() {
-        std::cout << "destructor called!" << std::endl;
-    }
-    // 删除拷贝构造函数和赋值操作符，防止复制和赋值
-    Singleton(const Singleton&) = delete;
-    Singleton& operator=(const Singleton&) = delete;
-    // 获取单例实例的静态成员函数
-    static Ptr getInstance() {
-        // 双重锁检查
-        if (m_pInstance == nullptr) {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            if (m_pInstance == nullptr) {
-                m_pInstance = Ptr(new Singleton); // 创建单例实例
-            }
-        }
-        return m_pInstance;
-    }
-private:
-    // 构造函数私有化，防止外部创建实例
-    Singleton() {
-        std::cout << "constructor called!" << std::endl;
-    }
-private:
-    // 静态成员变量，用于保存唯一实例
-    static Ptr m_pInstance;
-    // 互斥锁，用于保证多线程环境下的安全性
-    static std::mutex m_mutex;
-};
-// 初始化静态成员变量
-Singleton::Ptr Singleton::m_pInstance = nullptr;
-std::mutex Singleton::m_mutex;
-int main() {
-    // 通过静态成员函数获取单例实例
-    Singleton::Ptr instance = Singleton::getInstance();
-    return 0;
-}
-```
-
-
-
-### 使用局部静态变量（面试就写这个）
-
-函数的静态变量，如果当变量在初始化的时候，并发同时进入声明语句，并发线程将会阻塞等待初始化结束。从而保证了线程安全。
-
-```c++
-#include <iostream>
-class Singleton {
-public:
-    // 析构函数，用于在单例销毁时输出消息
-    ~Singleton() {
-        std::cout << "destructor called!" << std::endl;
-    }
-    // 删除拷贝构造函数和赋值操作符，防止复制和赋值
-    Singleton(const Singleton&) = delete;
-    Singleton& operator=(const Singleton&) = delete;
-    // 获取单例实例的静态成员函数
-    static Singleton& getInstance() {
-        // 在首次调用时创建唯一实例，利用了C++11的线程安全性保证
-        static Singleton instance;
-        return instance;
-    }
-private:
-    // 构造函数私有化，防止外部创建实例
-    Singleton() {
-        std::cout << "constructor called!" << std::endl;
-    }
-};
-int main() {
-    // 通过静态成员函数获取单例实例
-    Singleton& instance = Singleton::getInstance();
-    return 0;
-}
-```
-
-
-
-
-
-
-
-
-
-### 懒汉式局部静态变量提前销毁有什么办法（销毁后不会再创建了）
-
-设置一个bool标志位，然后把实例设置为NULL，然后获取实例的代码会先检查实例是不是NULL并且标志位是不是true，如果是的话直接返回NULL
-
-### 懒汉模式中线程安全需要两次判空的目的
-
-懒汉式单例模式中的“双重检查锁定”（double-checked locking）是一种多线程编程技巧，用来减少同步开销。
-
-懒汉式单例模式是指在第一次使用时实例化单例对象，而不是在程序启动时。因为创建对象可能是一个耗时操作，所以如果该单例对象可能不被用到，使用懒汉式可以避免不必要的性能开销。
-
-然而，这种方法在多线程环境中可能会导致问题。**如果多个线程同时尝试创建单例对象，可能会导致对象被多次创建，破坏单例模式的初衷。**
-
-双重检查锁定是解决这个问题的一种方法。它的步骤是：
-
-1. **首次检查**：如果单例对象已经创建，那么直接返回。这样可以避免已经创建了对象的情况下还要获取锁，从而减少了不必要的开销。
-2. **获取锁**：如果对象还未创建，那么获取锁，防止其他线程同时创建对象。
-3. **再次检查**：在获取锁之后，再次检查对象是否已经被创建。**这是因为在当前线程等待锁的期间，可能有其他线程已经创建了对象。如果已经创建，直接返回。**
-4. **创建对象**：如果对象还未被创建，那么在锁的保护下创建对象。
-
-这种方法可以保证单例对象在多线程环境中只被创建一次，并且在对象已经被创建后避免了获取锁的开销。然而，需要注意的是，这种方法在某些内存模型（例如Java的旧内存模型）中可能会因为重排序问题导致错误，需要使用volatile关键字或者其他方法来防止重排序。
-
-
-
-
-
-### 如何保证单例模式的线程安全
-
-C11之前双检测、C11后static
-
-### 单例模式中的get方法为什么是static的，可不可以作为成员函数
-
-static函数可以通过类名直接调用，不需要声明对象
-
-不可以，单例私有化了构造函数，外部不可以声明对象，因此无法调用成员函数get
-
-**单例模式它的主要目标是确保一个类只有一个实例，并提供一个全局访问点到这个实例。**
-
-
-
-### 继承单例模式，有哪些需要注意的地方？
-
-**实现要点：**
-
-- 构造函数需要是 `protected`，这样子类才能继承；
-- 将基类声明为友元，这样才能调用子类的**私有构造函数**。
-- 使用了奇异递归模板模式 CRTP(Curiously recurring template pattern) ，`enable_shared_form_this<T>` 也是用的这个
-
-- 基类实现同前
-
-- 在这里基类的析构函数可以不需要 `virtual` ，因为子类在应用中只会用 `Derived` 类型，保证了析构时和构造时的类型一致
-
-```c++
-template<typename T>
-class Singleton{
-public:
-    static T& getInstance(){
-        static T instance;
-        return instance;
-    }
- 
-    virtual ~Singleton(){
-        std::cout<<"destructor called!"<<std::endl;
-    }
- 
-    Singleton(const Singleton&)=delete;
-    Singleton& operator =(const Singleton&)=delete;
- 
-protected:
-    Singleton(){
-        std::cout<<"constructor called!"<<std::endl;
-    }
-};
- 
-/********************************************/
-// Example:
-// 1.friend class declaration is requiered!
-// 2.constructor should be private
- 
-class DerivedSingle : public Singleton<DerivedSingle>{
-    // !!!! attention!!!
-    // needs to be friend in order to
-    // access the private constructor/destructor
-    friend class Singleton<DerivedSingle>;
- 
-public:
-    DerivedSingle(const DerivedSingle&) = delete;
-    DerivedSingle& operator =(const DerivedSingle&) = delete;
- 
-private:
-    DerivedSingle() = default;
-};
-```
-
 
 
 ## 观察者模式
@@ -9955,6 +10212,16 @@ private:
 **观察者：**内部包含被观察者对象，当被观察者对象的状态发⽣变化时，更新⾃⼰的状态。（接收通知更新状态）
 
 **被观察者：**内部包含了所有观察者对象，当状态发⽣变化时通知所有的观察者更新⾃⼰的状态。（发送通知）
+
+
+
+**观察者模式是一种行为设计模式**，它定义了对象间的一对多依赖关系，当一个对象的状态发生改变时，所有依赖于它的对象都会得到通知并自动更新。这种模式经常用于实现分布式事件处理系统。观察者模式是MVC架构中的一个关键部分，其中模型（Model）是被观察者，视图（View）是观察者。
+
+### 应用场景
+
+1. **事件处理系统**: 在GUI库中，观察者模式用来响应用户的交互动作。例如，按钮被点击、鼠标移动、键盘按下等事件。按钮、鼠标和键盘作为被观察者，而UI元素（如文本框、标签、列表等）作为观察者，当事件发生时，相应的UI元素会更新。
+2. **发布-订阅系统**: 在消息队列和事件总线等系统中，观察者模式被用来实现发布-订阅模型，其中消息生产者发布消息，而消息消费者订阅消息并在消息到达时得到通知。
+3. **网络状态监控**: 在网络状态监控系统中，可以使用观察者模式来监控网络连接的状态，当网络状态发生变化时（如连接丢失、延迟增加等），相关的观察者（如重连机制、状态显示等）会得到通知并做出相应的响应。
 
 应⽤场景：
 
@@ -10021,6 +10288,42 @@ private:
 
 
 ## 工厂模式
+
+通过使用工厂模式，我们可以将对象的创建和使用分离
+
+简单工厂模式
+
+简单工厂模式中，一个工厂类根据传入的参数，决定创建出哪一种产品类的实例。简单工厂模式主要包含三个角色：
+
+- 工厂（Factory）：负责实现创建所有实例的内部逻辑
+- 抽象产品（Product）：定义产品的接口
+- 具体产品（Concrete Product）：实现产品接口的具体类
+
+工厂方法模式
+
+工厂方法模式定义了一个创建对象的接口，但由子类决定要实例化的类是哪一个。工厂方法让类把实例化推迟到子类。工厂方法模式主要包含四个角色：
+
+- 抽象工厂（Abstract Factory）：声明创建产品的接口
+- 具体工厂（Concrete Factory）：实现抽象工厂的创建产品接口，返回一个具体产品实例
+- 抽象产品（Product）：定义产品的接口
+- 具体产品（Concrete Product）：实现产品接口的具体类
+
+抽象工厂模式
+
+抽象工厂模式提供了一个接口，用于创建一系列相关或相互依赖对象的家族，而不需要指定它们具体的类。抽象工厂模式主要包含四个角色：
+
+- 抽象工厂（Abstract Factory）：声明创建抽象产品对象的接口
+- 具体工厂（Concrete Factory）：实现创建具体产品对象的操作
+- 抽象产品（Abstract Product）：声明一类产品对象的接口
+- 具体产品（Concrete Product）：实现抽象产品接口，定义一个将被相应的具体工厂创建的产品对象
+
+
+
+### 应用场景
+
+- GUI库中，提供一个创建按钮、窗口等GUI元素的工厂，客户端代码可以不直接依赖于具体的按钮或窗口类。
+- 数据库连接池，使用工厂模式来创建和管理数据库连接，提供数据库连接的复用和管理。
+- 日志库，使用工厂模式来创建日志对象，可以根据配置文件动态决定使用哪种日志级别和输出方式。
 
 ### 简单工厂模式
 
@@ -10199,6 +10502,17 @@ public:
 
 这种类型的设计模式属于结构型模式，它是作为现有的类的⼀个包装。
 
+装饰器模式用于动态地给一个对象添加一些额外的职责，而不改变其结构。
+
+### 应用场景
+
+1. **图形界面组件装饰**: 用于为窗口或控件添加额外的功能，如滚动条、边框、阴影等。
+2. **数据流处理**: 在读写数据流的过程中添加额外的处理，如数据加密、压缩、校验等。
+3. **权限控制**: 动态地为对象添加权限控制功能。
+4. **性能监控**: 为方法或对象添加性能监控代码，记录执行时间等信息。
+5. **日志记录**: 为方法调用添加日志记录功能，记录方法的调用参数、返回值等信息。
+6. **事务处理**: 在数据库操作前后添加事务处理逻辑。
+
 ```cpp
 #include <iostream>
 #include <list>
@@ -10293,7 +10607,7 @@ int main() {
 
 ## 代理模式
 
-代理模式（Proxy Pattern）是一种结构型设计模式，其主要目的是为其他对象提供一个代理（代表）以控制对这个对象的访问。代理模式可以用于各种不同的场景，例如延迟加载，权限控制，远程代理等。
+代理模式（Proxy Pattern）是一种结构型设计模式，其主要目的是为其他对象提供一个代理（代表）以控制对这个对象的访问。代理模式可以用于各种不同的场景，例如延迟加载，权限控制，远程代理等。代理模式涉及到为其他对象提供一个代理或占位符，以控制对这个对象的访问。
 
 代理模式通常涉及以下几个角色：
 
@@ -10307,6 +10621,17 @@ int main() {
 - 延迟加载：代理可以用于延迟加载真实主题，只有在需要时才会真正创建或初始化真实主题，提高性能。
 - 远程代理：代理可以用于在客户端和远程服务器之间进行通信，隐藏底层通信细节。
 
+
+
+### 应用场景
+
+1. **远程代理**: 为一个对象在不同的地址空间提供局部代表。比如，Java的RMI（Remote Method Invocation）。
+2. **虚拟代理**: 根据需要创建开销很大的对象。例如，惰性初始化一个很大的图像对象。
+3. **保护代理**: 控制对原始对象的访问。保护代理用于对象应该有不同访问权限的时候。
+4. **智能指针**: 在对象访问时执行附加操作，如引用计数和线程安全检查。
+
+
+
 代理模式的实现方式多种多样，下面是一个简单的示例，演示了代理模式的基本结构：
 
 ![](https://img-blog.csdnimg.cn/e7b59f2e6d3d4c0bada603b31a0f8ea2.png)
@@ -10318,6 +10643,15 @@ int main() {
 
 
 ## 生产者消费者模式
+
+生产者消费者模式是一种同步机制，用于解决多进程或多线程环境中资源共享的问题。
+
+### 应用场景
+
+1. **任务调度**: 一个或多个生产者生成任务，放入队列，然后一个或多个消费者从队列中取任务执行。
+2. **日志系统**: 多个线程或进程产生日志，作为生产者，而单独的日志服务作为消费者，负责处理日志信息。
+3. **消息队列系统**: 如Kafka、RabbitMQ等，生产者发送消息到队列，消费者从队列中取出并处理消息。
+4. **线程池**: 线程池中的线程（消费者）执行任务队列（生产者放入的任务）中的任务。
 
 ```cpp
 #include <condition_variable>
@@ -10412,122 +10746,259 @@ int main() {
 
 # 其他：
 
-## 100亿数据找最大的一万个数，找第k大的数
+## Socket编程API、返回值
 
-1. **找最大的一万个数**：
+1. **socket()**
+   创建一个新的套接字。
 
-   **使用最小堆**（Min-Heap）。这种数据结构可以在O(logm)的时间内插入和删除元素，其中 m 是堆中的元素数量。
+   ```C++
+   int socket(int domain, int type, int protocol);
+   ```
 
-   步骤：
+2. **bind()**
+   将套接字绑定到特定的地址和端口。
 
-   - 创建一个容量为 10,000 的最小堆。
-   - 遍历数据集中的每个数字：
-     - 如果堆不满（即数量小于10,000），则向堆中插入该数字。
-     - 如果堆已满并且当前数字大于堆顶的数字（堆顶是目前堆中的最小数字），则删除堆顶的数字，并将当前数字插入堆中。
-   - 当所有数字都已遍历完，堆中的数字就是最大的10,000个数字。
+   ```C++
+   int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+   ```
 
-   这种方法的时间复杂度近似为 O(nlogm)，其中 n 是数据集的大小，m 是要找的数字的数量（在这里 m = 10,000）。
+3. **listen()**
+   让套接字进入监听模式，等待连接请求。
 
+   ```C++
+   int listen(int sockfd, int backlog);
+   ```
+
+4. **accept()**
+   接受来自客户端的连接请求。
+
+   ```C++
+   int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+   ```
+
+5. **connect()**
+   尝试与服务器端的套接字建立连接。
+
+   ```C++
+   int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+   ```
+
+6. **send()**, **recv()**
+   用于发送和接收数据。
+
+   ```C++
+   ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+   ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+   ```
+
+7. **sendto()**, **recvfrom()**
+   用于无连接的数据传输（例如UDP）。
+
+   ```C++
+   ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
    
+   ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
+   ```
 
-   **使用分治**，我们可以将原始的数据分成若干小组，然后分别在每个小组中找到最大的一万个数。最后，从这些小组的结果中选出整体的最大一万个数。
+8. **close()**
+   用于关闭套接字。
 
-   步骤：
+   ```c++
+   int close(int fd);
+   ```
 
-   1. 将100亿个数分成若干小组。例如，每组有1000万个数。
-   2. 对于每一组，使用任意方法（如排序或最小堆）找到该组中最大的一万个数。
-   3. 将所有小组中选出的数合并成一个列表，这个列表有的元素数量会是 10000 * 小组的数量。
-   4. 最后，再从这个合并后的列表中选出最大的一万个数。
+9. **getaddrinfo()**, **freeaddrinfo()**, **gai_strerror()**
 
-2. **找第 k 大的数**：
+   这些函数用于DNS查找，将域名转换为套接字地址结构。
 
-   快速选择的基本思想是：如果基准元素在排序数组中的位置是 k，那么基准元素就是第 k 大的数。
+   ```C++
+   int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
+   
+   void freeaddrinfo(struct addrinfo *res);
+   
+   const char *gai_strerror(int errcode);
+   ```
 
-   1. 快速选择（QuickSelect）算法就是基于分治思想的。
+   **setsockopt()**, **getsockopt()**
+   设置或获取套接字选项。
 
-      步骤：
+   ```c++
+   cCopy codeint setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
+   
+   int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
+   ```
 
-      1. 从列表中随机选择一个元素作为基准。
-      2. 将列表分成两部分：一部分包含比基准小的元素，另一部分包含比基准大的元素。
-      3. 判断 k 是在基准的左边还是右边：
-         - 如果 k 等于右边部分的大小加1，那么基准就是我们要找的第 k 大的数。
-         - 如果 k 小于右边部分的大小，说明第 k 大的数在右边，对右边的数据递归执行快速选择。
-         - 否则，第 k 大的数在左边，对左边的数据递归执行快速选择，并对 k 进行相应调整。
-      4. 递归进行，直到找到第 k 大的数。
+### 返回值:
 
-      可以在平均情况下以 O(n) 的时间复杂度找到第 k 大的数。在最差的情况下，其时间复杂度是 O(n^2)，但可以通过随机化选择基准元素来避免这种情况。
+大多数Socket API函数在成功时返回非负值，但在出错时返回-1。当这些函数返回-1时，可以使用`errno`来确定发生了什么错误，并使用`perror()`或`strerror(errno)`来获取描述性的错误消息。
 
-   在分治思想的应用中，关键是如何将原问题分解成一个或多个更小的子问题，然后如何合并这些子问题的答案来得到原问题的答案。
+例如：
 
+```c++
+if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+    perror("bind");
+    // 或者: printf("bind: %s\n", strerror(errno));
+    exit(1);
+}
+```
 
+`accept()`, `recv()`, `send()`, `recvfrom()`, 和 `sendto()` 这些函数返回的是其他特定的值，如传输的字节数，或者在错误时返回-1。
 
-## Linux命令相关
+当处理Sockets和网络错误时，了解可能的`errno`值是很有帮助的，如`ECONNREFUSED`, `ETIMEDOUT`, `EHOSTUNREACH`等。
 
-### 查找一个字符串是否在文件中命令
-
-用grep命令，`grep "要查找的字符串" 文件名`,如果字符串存在于文件中，`grep` 命令将会输出包含该字符串的行。如果不存在于文件中，则不会输出任何内容。
-
-### 查找本机一个端口号的状态
-
-`netstat -tuln | grep 端口号`，在上述命令中，`-tuln` 选项用于显示 TCP 和 UDP 的监听端口，而 `grep` 命令用于过滤出指定的端口号。
-
-### 查看CPU利用率
-
-`top`命令
-
-### 查看网络状态
-
-`ifconfig`
-
-单纯执行`netstat`是查看所有socket
-
-只看TCP连接的网络信息`netstat -t`
-
-### 网络测试
-
-`ping`
-
-### 判断远程服务的端口有没有开启
-
-`telnet 远程主机地址 远程端口号`，使用 `telnet` 命令可以尝试与远程主机的指定端口建立连接。
-
-如果连接成功，说明该端口是开启的；如果连接失败或超时，则说明该端口是关闭的。
-
-### DNS查询
-
-比如`host www.baidu.com`
-
-### Linu命令常用
-
-Linux删除文件的命令？  
-
-Linux创建文件和文件夹的命令？  
-
-Linux如何查看当前运行的进程状态？  
-
-Linux如何指定查看某一个进程的信息？ 
-
-Linux查看进程的CPU和内存占用率  
-
-Linux中cp和scp命令分别是用来做什么的？ 
-
-1. Linux删除文件的命令是 **`rm`**。例如，删除一个名为 `example.txt` 的文件，你可以使用命令 `rm example.txt`。
-2. 在Linux中，创建文件的命令通常是 **`touch`**。例如，创建一个名为 `example.txt` 的文件，你可以使用命令 `touch example.txt`。创建文件夹的命令是 `mkdir`。例如，创建一个名为 `example` 的文件夹，你可以使用命令 `mkdir example`。
-3. 在Linux中，查看当前运行的进程状态的命令通常是 `ps` **或 `top`**。`ps` 命令可以显示当前进程的快照，而 `top` 命令可以显示实时的进程状态。
-4. 若要查看某个特定进程的信息，你可以使用 `ps` 命令并附上进程ID（PID）。例如，要查看PID为123的进程，你可以使用命令 **`ps -p 123`。**
-5. 要**查看进程的CPU和内存使用情况，可以使用 `top` 命令。**这个命令会显示一个实时更新的列表，列出系统中的进程，并显示它们的CPU和内存使用情况。如果你只想看到一个特定的进程，可以使用 `top -p [PID]`，其中 `[PID]` 是进程ID。
-6. 在Linux中，**`cp` 是一个复制文件或文件夹的命令**，比如 `cp source destination`。`scp` 是一个安全的远程文件复制命令，它在本地和远程计算机之间复制文件，并使用SSH进行数据传输，比如 `scp source user@remote:destination`。
+总的来说，这只是Socket编程API的一个简单概述，实际应用中还有许多细节和额外的功能需要深入了解。
 
 
 
-### 查看当前进程
+### epoll的函数
+
+主要由三个：
+
+```c++
+int epoll_create(int size);
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+int epoll_wait(int epfd, struct epoll_event *events,int maxevents, int timeout);
+```
+
+> 1. **调用epoll_create**建立一个epoll对象(在epoll文件系统中给这个句柄分配资源)；向操作系统申请创建文件描述符的空间**（这个文件描述符都是在内核空间中）；
+>
+> 2. **调用epoll_ctl**，刚创立的socket加入到epoll对象中进行监控，或者将某个正在监控的socket移除，不在监控；
+>
+> 3. **`epoll_wait` 函数**是 Linux 上用于 I/O 多路复用的系统调用之一，它属于 `epoll` 系列函数的一部分。`epoll` 机制允许程序监视多个文件描述符，以便能够在其中一个或多个文件描述符上有数据可读、可写或出现异常时，立即得到通知。
+>
+> 4. 参数说明
+>
+>    - **`int epfd`:** `epoll` 实例的文件描述符，由 `epoll_create` 或 `epoll_create1` 函数创建。
+>
+>    - **`struct epoll_event *events`:** 用来从内核得到事件的集合。`events` 参数指向的数组用来返回满足条件的事件，它是一个 `epoll_event` 结构体数组。
+>
+>    - **`int maxevents`:** 告诉内核这个 `events` 数组有多大，即最多返回多少个事件。`maxevents` 必须大于零。
+>
+>    - **`int timeout`:** 指定超时时间，单位是毫秒。函数在等待文件描述符准备好的事件时将阻塞。
+>
+>      如果 `timeout` 设为 -1，`epoll_wait` 将一直阻塞直到有事件发生；如果设为 0，则 `epoll_wait` 将立即返回，即使没有事件发生；如果设为一个正数，则 `epoll_wait` 会等待指定的毫秒数。
+>
+>    ### 返回值
+>
+>    - 返回发生的事件数：如果 `epoll_wait` 成功运行，并且检测到了事件，它将返回一个大于 0 的数，表示发生的事件数。
+>    - 返回 0：如果没有检测到事件，并且 `timeout` 时间已经过去，`epoll_wait` 将返回 0。
+>    - 返回 -1：如果在等待事件时发生了错误，`epoll_wait` 将返回 -1，并且 `errno` 被设置为错误的具体原因。
+>
+>    
+>
+>    
+
+
+
+### pthread_cond_wait传递 mutex 参数
+
+**结论**
+
+**`mutex` 参数在 `pthread_cond_wait` 中的作用是确保条件变量的使用是安全和正确的。它保护了与条件变量相关的共享资源，提供了原子操作的能力，帮助处理虚假唤醒的情况，并确保了多线程环境下对共享资源的顺序一致访问。**
+
+`pthread_cond_wait` 函数是 POSIX 线程库中用于线程同步的函数之一。这个函数的作用是让当前线程在指定的条件变量上等待，直到另一个线程通过 `pthread_cond_signal` 或 `pthread_cond_broadcast` 函数通知它继续执行。
+
+**函数的原型是：**
+
+```c++
+int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
+```
+
+`pthread_cond_wait` 需要传递 `mutex` 参数的原因主要有以下几点：
+
+1. 保护条件的一致性
+
+`mutex` 用来保护与条件变量相关联的共享资源。当一个线程检查条件是否满足，并决定进入等待状态时，这两个操作需要是原子的，以防止其他线程在这个检查和等待之间修改共享资源。互斥锁 `mutex` 提供了这种原子操作的能力。
+
+2. 防止虚假唤醒
+
+虚假唤醒是指一个或多个线程被唤醒，即使没有线程显式地发出通知。虽然 POSIX 标准并没有要求实现避免虚假唤醒，但在实践中，程序应该能够处理这种情况。通过在 `pthread_cond_wait` 返回后重新检查条件，并在必要时再次等待，可以防止虚假唤醒造成的问题。`mutex` 用于确保这个重新检查过程是安全的。
+
+3. 顺序一致性
+
+`mutex` 参数还帮助确保在多个线程之间对共享资源的访问是顺序一致的。使用互斥锁可以确保对共享资源的所有访问都是串行化的，这样就可以避免复杂的并发问题。
+
+## Linux命令总结
+
+### 常见Linux命令
+
+1. **`touch`：创建一个新文件或更新已有文件的时间戳。**
+
+2. **`cat`：连接文件并打印到标准输出。**
+
+3. **`grep`：在文件中搜索指定的模式。**查找一个字符串是否在文件中命令
+
+   用grep命令，`grep "要查找的字符串" 文件名`,如果字符串存在于文件中，`grep` 命令将会输出包含该字符串的行。如果不存在于文件中，则不会输出任何内容。
+
+4. **`find`：在文件系统中搜索文件和目录。**
+
+5. **`ps`：查看当前进程状态**
+
+6. **`top`：查看进程的CPU和内存使用情况**，top -H可以找到CPU使用率最高的线程
+
+7. **`ifconfig`：显示和配置网络接口信息。**
+
+8. **`netstat`：显示网络连接和网络统计信息。**
+
+9. **`ps`：显示当前运行的进程。**
+
+10. **`scp`：在本地主机和远程主机之间复制文件。**
+
+11. **`ping`：测试与另一台主机的网络连接。**
+
+12. **`kill`：终止正在运行的进程。**
+
+13. `ls`：列出目录中的文件和子目录。
+
+14. `cd`：改变当前工作目录。
+
+15. `pwd`：显示当前工作目录的路径。
+
+16. `mkdir`：创建一个新目录。
+
+17. `rm`：删除文件或目录。
+
+18. `cp`：复制文件和目录。
+
+19. `mv`：移动文件和目录，或者重命名文件。
+
+20. `less`：与 `more` 类似，但允许向前和向后浏览文件。
+
+21. `head`：显示文件的前几行。
+
+22. `tail`：显示文件的后几行。
+
+23. `chmod`：修改文件或目录的权限。
+
+24. `chown`：修改文件或目录的所有者。
+
+25. `chgrp`：修改文件或目录的所属组。
+
+26. `tar`：打包和解包文件。
+
+27. `gzip`：压缩文件。
+
+28. `sudo`：以管理员权限运行命令
+
+29. `gunzip`：解压缩文件。
+
+30. `ssh`：通过安全外壳（SSH）登录远程主机。
+
+⚠️开发中一定要学会查看文档，通过`man`命令来查看，比如：`man ls`
+
+### 查看当前进程ps
+
+1. **ps**: `ps`命令用来显示当前进程的状态。一些常用的选项包括:
+   - `ps aux`: 显示所有进程的详细状态。
+   - `ps -e`: 显示所有进程。
+   - `ps -u 用户名`: 显示指定用户的所有进程。
+2. **top**: `top`命令提供了一个实时更新的进程状态动态视图。它类似于Windows中的任务管理器。
 
 ```ba
 ps -ef | grep java  # 显示出所有关于java的进程
-
 ```
 
-**杀死进程**
+**杀死进程**kill
 
 
 ```bash
@@ -10538,161 +11009,31 @@ kill -9 PID
 
 
 
-### 查看进程的线程
+### 查看进程的线程ps -p  pid。
 
-找到相关进程，然后记录pid
+1. **ps -T**: 查看进程的所有线程。
 
-```
-pstree -p 5346(进程ID)
-top -H 所有线程
-top -H -p <pid>
-```
+   ```
+   ps -T -p 进程ID
+   ```
 
-**如果要计算数量，可以用`wc -l`，-l表示要计算行数**
+2. **top -H**: 在top命令中，你可以按`H`来切换显示线程。
 
-内核相关命令
+3. **htop**: `htop`是`top`的一个增强版，它提供了一个彩色的界面和更多的信息，并且可以更容易地查看和管理线程。在`htop`中，按`F5`可以查看树形视图，这可以帮助你看到线程与其父进程之间的关系。
 
-uname
+### 网络状态`ifconfig`、网络测试ping
 
-```bash
-uname -r  # 查看内核版本
-uname -a  #查看系统信息，内核名称，主机名，内核版本，处理器架构，处理器位数啥的
-Linux VM-16-12-centos 3.10.0-1160.45.1.el7.x86_64 #1 SMP Wed Oct 13 17:20:51 UTC 2021 x86_64 x86_64 x86_64 GNU/Linux
-cat /proc/version #跟uname -a一样
-```
+### 远程服务的端口telnet
 
-查看CPU信息
+`telnet 远程主机地址 远程端口号`，使用 `telnet` 命令可以尝试与远程主机的指定端口建立连接。
 
-```bash
-cat /proc/cpuinfo
-```
+如果连接成功，说明该端口是开启的；如果连接失败或超时，则说明该端口是关闭的。
 
-依次打印每一个核数的相关信息
+**找本机端口号状态**
 
-查看系统位数
-
-```bash
-getconf LONG_BIT
-```
-
-查看Linux版本
-
-```bash
-cat /etc/os-release
-
-NAME="CentOS Linux"
-VERSION="7 (Core)"
-ID="centos"
-ID_LIKE="rhel fedora"
-VERSION_ID="7"
-PRETTY_NAME="CentOS Linux 7 (Core)"
-ANSI_COLOR="0;31"
-CPE_NAME="cpe:/o:centos:centos:7"
-HOME_URL="https://www.centos.org/"
-BUG_REPORT_URL="https://bugs.centos.org/"
-
-CENTOS_MANTISBT_PROJECT="CentOS-7"
-CENTOS_MANTISBT_PROJECT_VERSION="7"
-REDHAT_SUPPORT_PRODUCT="centos"
-REDHAT_SUPPORT_PRODUCT_VERSION="7"
-
-```
-
-查看内核版本
-
-```bash
-cat /proc/version
-
-Linux version 3.10.0-1160.45.1.el7.x86_64 (mockbuild@kbuilder.bsys.centos.org) (gcc version 4.8.5 20150623 (Red Hat 4.8.5-44) (GCC) ) #1 SMP Wed Oct 13 17:20:51 UTC 2021
-
-$arch即可查看linux的内核版本
-```
-
-Centos如何查看日志
-
-```c++
-/var/log/message 系统启动后的信息和错误日志，是Red Hat Linux中最常用的日志之一
-/var/log/secure 与安全相关的日志信息
-/var/log/maillog 与邮件相关的日志信息
-/var/log/cron 与定时任务相关的日志信息
-/var/log/spooler 与UUCP和news设备相关的日志信息
-/var/log/boot.log 守护进程启动和停止相关的日志消息
-/var/log/wtmp 该日志文件永久记录每个用户登录、注销及系统的启动、停机的事件
-```
-
-1、tail
-
-```
-tail  -n  10   test.log   查询日志尾部最后10行的日志;
-```
-
-2、head
-
-```
-head -n  10  test.log   查询日志文件中的头10行日志;
-head -n -10  test.log   查询日志文件除了最后10行的其他所有日志;
-```
-
-3、cat
-
-直接查看全部
-
-4、sed
-
-这个命令可以查找日志文件特定的一段 ,可以按照行号和时间范围查询
-
-```
-sed -n '5,10p' filename 这样你就可以只查看文件的第5行到第10行。
-sed -n '/2014-12-17 16:17:20/,/2014-12-17 16:17:36/p'  test.log
-```
+`netstat -tuln | grep 端口号`，在上述命令中，`-tuln` 选项用于显示 TCP 和 UDP 的监听端口，而 `grep` 命令用于过滤出指定的端口号。
 
 
-
-
-
-
-
-
-
-
-
-## Linux50个命令总结
-
-1. `ls`：列出目录中的文件和子目录。
-2. `cd`：改变当前工作目录。
-3. `pwd`：显示当前工作目录的路径。
-4. `mkdir`：创建一个新目录。
-5. `rm`：删除文件或目录。
-6. `cp`：复制文件和目录。
-7. `mv`：移动文件和目录，或者重命名文件。
-8. **`touch`：创建一个新文件或更新已有文件的时间戳。**
-9. **`cat`：连接文件并打印到标准输出。**
-10. `more`：逐页显示文件内容。
-11. `less`：与 `more` 类似，但允许向前和向后浏览文件。
-12. `head`：显示文件的前几行。
-13. `tail`：显示文件的后几行。
-14. **`grep`：在文件中搜索指定的模式。**
-15. **`find`：在文件系统中搜索文件和目录。**
-16. `chmod`：修改文件或目录的权限。
-17. `chown`：修改文件或目录的所有者。
-18. `chgrp`：修改文件或目录的所属组。
-19. `tar`：打包和解包文件。
-20. `gzip`：压缩文件。
-21. `sudo`：以管理员权限运行命令
-22. `ps`：查看当前进程状态
-23. **`top`：查看进程的CPU和内存使用情况**，top -H可以找到CPU使用率最高的线程
-24. `gunzip`：解压缩文件。
-25. `wget`：从网络上下载文件。
-26. `ssh`：通过安全外壳（SSH）登录远程主机。
-27. `scp`：在本地主机和远程主机之间复制文件。
-28. `ping`：测试与另一台主机的网络连接。
-29. **`ifconfig`：显示和配置网络接口信息。**
-30. **`netstat`：显示网络连接和网络统计信息。**
-31. **`ps`：显示当前运行的进程。**
-32. `kill`：终止正在运行的进程。
-33. `sudo`：以超级用户权限执行命令。
-
-⚠️开发中一定要学会查看文档，通过`man`命令来查看，比如：`man ls`
 
 
 
@@ -10729,12 +11070,48 @@ cat filename | tail -n +3000 | head -n 1000 从第3000行开始，显示1000(即
 - `-`符号代表删除目标用户相应的权限。
 - `=`符号代表添加目标用户相应的权限，删除未提到的权限。
 
+**使用数字表示法：**
+
+1. **给拥有者全部权限，给组和其他人读和执行权限**:
+
+   ```c++
+   chmod 755 filename
+   ```
+
+   这里 7 = 4 (read) + 2 (write) + 1 (execute)，5 = 4 (read) + 1 (execute)。
+
+2. **给拥有者读和写权限，给组和其他人只读权限**:
+
+   ```c++
+   chmod 644 filename
+   ```
+
+   这里 6 = 4 (read) + 2 (write)，4 = 4 (read)。
+
+3. **给所有人读、写和执行权限**:
+
+   ```c++
+   chmod 777 filename
+   ```
+
 ```bash
 # 当前用户具有所有权限，组用户有读写权限，其他用户只有读权限。
 chmod u=rwx, g=rw, o=r ./test.log
 # 等价的八进制数表示：
 chmod 764 ./test.log
 ```
+
+- 改变文件权限命令
+
+  > chmod 权限数字（如777） filename
+
+- 改变目录下所有的文件的权限命令
+
+  > chmod -R 权限数字（如777） 目录(如/home)
+
+
+
+
 
 ### chown （变更拥有者）
 
@@ -10745,6 +11122,8 @@ chown -R liu /usr/meng
 # 将目录/usr/meng及其下面的所有文件、子目录的文件主改成 liu：
 # -R表示递归处理
 ```
+
+
 
 ### top（CPU资源占用情况）
 
@@ -10954,7 +11333,72 @@ Netstat 命令用于显示各种网络相关信息，如网络连接，路由表
   2. Active UNIX domain sockets，称为有源Unix域套接口(和网络套接字一样，但是只能用于本机通信，性能可以提高一倍)。
      Proto显示连接使用的协议,RefCnt表示连接到本套接口上的进程号,Types显示套接口的类型,State显示套接口当前的状态,Path表示连接到套接口的其它进程使用的路径名。
 
-- 
+
+
+### ip（ifconfig显示网络设备信息)
+
+linux的ip命令和ifconfig类似，但前者功能更强大，并旨在取代后者。使用ip命令，只需一个命令，你就能很轻松地执行一些网络管理任务。ifconfig是net-tools中已被废弃使用的一个命令，许多年前就已经没有维护了。iproute2套件里提供了许多增强功能的命令，ip命令即是其中之一。
+
+```bash
+ip link show                     # 显示网络接口信息
+ip link set eth0 up             # 开启网卡
+ip link set eth0 down            # 关闭网卡
+ip link set eth0 promisc on      # 开启网卡的混合模式
+ip link set eth0 promisc offi    # 关闭网卡的混个模式
+ip link set eth0 txqueuelen 1200 # 设置网卡队列长度
+ip link set eth0 mtu 1400        # 设置网卡最大传输单元
+ip addr show     # 显示网卡IP信息
+ip addr add 192.168.0.1/24 dev eth0 # 设置eth0网卡IP地址192.168.0.1
+ip addr del 192.168.0.1/24 dev eth0 # 删除eth0网卡IP地址
+```
+
+
+
+### awk(对文本和数据处理)
+
+**awk** 是一种脚本编程语言，用于在linux/unix下对文本和数据进行处理。数据可以来自标准输入(stdin)、一个或多个文件，或其它命令的输出。AWK命令是由三个人的名字首字母命名的--Aho、Weinberger和Kernighan。他们来自AT&T贝尔实验室，也在Unix Shell脚本中贡献了许多其他命令行提示。
+
+它在命令行中使用，但更多是作为脚本来使用。awk有很多内建的功能，比如数组、函数等，这是它和C语言的相同之处，灵活性是awk最大的优势。
+
+**AWK命令的基本语法**
+
+```shell
+awk [options] [program] [file]
+```
+
+awk工作流程是这样的：读入有\n换行符分割的一条记录，然后将记录按指定的域分隔符划分域，填充域，`$0`则表示所有域,`$1`表示第一个域,`$n`表示第n个域。默认域分隔符是"空白键" 或 "[tab]键"，举个例子：
+
+```bash
+[root@www ~]# last -n 5 <==仅取出前五行
+root     pts/1   192.168.1.100  Tue Feb 10 11:21   still logged in
+root     pts/1   192.168.1.100  Tue Feb 10 00:46 - 02:28  (01:41)
+root     pts/1   192.168.1.100  Mon Feb  9 11:41 - 18:30  (06:48)
+dmtsai   pts/1   192.168.1.100  Mon Feb  9 11:41 - 11:41  (00:00)
+root     tty1                   Fri Sep  5 14:09 - 14:10  (00:01)
+```
+
+如果只是显示最近登录的5个帐号
+
+```
+#last -n 5 | awk  '{print $1}'
+root
+root
+root
+dmtsai
+root
+```
+
+所以`$1`表示登录用户，`$3`表示登录用户ip,以此类推。
+
+比如下列代码：
+
+```shell
+awk '{printf "第一列：%s 第二列：%s\n",$1,$2}' #在控制台输入两个信息，然后输出
+melon water
+第一列：melon 第二列：water
+```
+
+
 
 
 ### traceroute（追踪网络包的路由途径）
@@ -11003,68 +11447,6 @@ route del default gw 192.168.120.240
 route add default gw 192.168.120.240
 ```
 
-### ip（ifconfig显示网络设备信息)
-
-linux的ip命令和ifconfig类似，但前者功能更强大，并旨在取代后者。使用ip命令，只需一个命令，你就能很轻松地执行一些网络管理任务。ifconfig是net-tools中已被废弃使用的一个命令，许多年前就已经没有维护了。iproute2套件里提供了许多增强功能的命令，ip命令即是其中之一。
-
-```bash
-ip link show                     # 显示网络接口信息
-ip link set eth0 up             # 开启网卡
-ip link set eth0 down            # 关闭网卡
-ip link set eth0 promisc on      # 开启网卡的混合模式
-ip link set eth0 promisc offi    # 关闭网卡的混个模式
-ip link set eth0 txqueuelen 1200 # 设置网卡队列长度
-ip link set eth0 mtu 1400        # 设置网卡最大传输单元
-ip addr show     # 显示网卡IP信息
-ip addr add 192.168.0.1/24 dev eth0 # 设置eth0网卡IP地址192.168.0.1
-ip addr del 192.168.0.1/24 dev eth0 # 删除eth0网卡IP地址
-```
-
-
-
-### awk(d对文本和数据处理)
-
-**awk** 是一种脚本编程语言，用于在linux/unix下对文本和数据进行处理。数据可以来自标准输入(stdin)、一个或多个文件，或其它命令的输出。AWK命令是由三个人的名字首字母命名的--Aho、Weinberger和Kernighan。他们来自AT&T贝尔实验室，也在Unix Shell脚本中贡献了许多其他命令行提示。
-
-它在命令行中使用，但更多是作为脚本来使用。awk有很多内建的功能，比如数组、函数等，这是它和C语言的相同之处，灵活性是awk最大的优势。
-
-**AWK命令的基本语法**
-
-```shell
-awk [options] [program] [file]
-```
-
-awk工作流程是这样的：读入有\n换行符分割的一条记录，然后将记录按指定的域分隔符划分域，填充域，`$0`则表示所有域,`$1`表示第一个域,`$n`表示第n个域。默认域分隔符是"空白键" 或 "[tab]键"，举个例子：
-
-```bash
-[root@www ~]# last -n 5 <==仅取出前五行
-root     pts/1   192.168.1.100  Tue Feb 10 11:21   still logged in
-root     pts/1   192.168.1.100  Tue Feb 10 00:46 - 02:28  (01:41)
-root     pts/1   192.168.1.100  Mon Feb  9 11:41 - 18:30  (06:48)
-dmtsai   pts/1   192.168.1.100  Mon Feb  9 11:41 - 11:41  (00:00)
-root     tty1                   Fri Sep  5 14:09 - 14:10  (00:01)
-```
-
-如果只是显示最近登录的5个帐号
-
-```
-#last -n 5 | awk  '{print $1}'
-root
-root
-root
-dmtsai
-root
-```
-
-所以`$1`表示登录用户，`$3`表示登录用户ip,以此类推。
-
-比如下列代码：
-
-```shell
-awk '{printf "第一列：%s 第二列：%s\n",$1,$2}' #在控制台输入两个信息，然后输出
-melon water
-第一列：melon 第二列：water
-```
 
 
 
@@ -11077,8 +11459,7 @@ melon water
 
 
 
-
-## Linux各个目录作用
+### Linux各个目录作用
 
 | 目录        | 说明                                                         |
 | ----------- | ------------------------------------------------------------ |
@@ -11107,21 +11488,9 @@ melon water
 
 
 
-# QPS和TPS
-
-QPS（Queries Per Second）和 TPS（Transactions Per Second）是用来衡量系统处理能力的指标。
-
-QPS 表示**每秒钟处理的请求数量**，通常用于**衡量系统的网络吞吐量**。TPS 则表示**每秒钟完成的事务数量**，通常用于**衡量系统的事务处理能力**。
-
-`QPS = 总请求次数/时间`
 
 
-
-
-
-
-
-# CMake图
+# CMake
 
 ## CMake构建流程
 
@@ -11139,13 +11508,53 @@ QPS 表示**每秒钟处理的请求数量**，通常用于**衡量系统的网�
 
    命令使用前面生成的Makefile来构建项目。具体地，`make`命令将**编译和链接源代码，生成可执行文件**、库或其他构建目标。
 
-![1690187478151](../C-add-add-master/C-add-add-master/Typora%E7%94%A8%E5%88%B0%E5%9B%BE%E7%89%87/1690187478151.jpg)
+### 1. 创建 CMakeLists.txt 文件
 
-![1690187453876](../C-add-add-master/C-add-add-master/Typora%E7%94%A8%E5%88%B0%E5%9B%BE%E7%89%87/1690187453876.jpg)
+在你的项目根目录下，创建一个名为 `CMakeLists.txt` 的文件。这个文件将包含描述你的项目构建过程的所有信息。
 
-![1690187436123](../C-add-add-master/C-add-add-master/Typora%E7%94%A8%E5%88%B0%E5%9B%BE%E7%89%87/1690187436123.jpg)
+一个基本的 `CMakeLists.txt` 示例可能如下所示：
 
-![1690187414105](../C-add-add-master/C-add-add-master/Typora%E7%94%A8%E5%88%B0%E5%9B%BE%E7%89%87/1690187414105.jpg)
+```
+cmake_minimum_required(VERSION 3.10)
+
+project(MyProject)
+
+add_executable(MyExecutable main.cpp)
+```
+
+在这个例子中：
+
+- `cmake_minimum_required(VERSION 3.10)` 指定了需要的最低 CMake 版本。
+- `project(MyProject)` 设置了项目的名字。
+- `add_executable(MyExecutable main.cpp)` 添加了一个可执行目标，它将编译 `main.cpp` 来生成名为 `MyExecutable` 的可执行文件。
+
+### 2. 运行 CMake
+
+在命令行中，导航到你的项目目录，然后运行 CMake：
+
+```
+mkdir build
+cd build
+cmake ..
+```
+
+这些命令创建了一个名为 `build` 的目录（如果它不存在的话），然后在这个目录中运行 CMake。`..` 是指项目根目录的位置，它应该包含你的 `CMakeLists.txt` 文件。
+
+CMake 将处理 `CMakeLists.txt` 文件，并生成适合你系统的构建文件。
+
+### 3. 构建项目
+
+最后一步是实际构建你的项目。如果 CMake 生成了 Makefile，你可以使用 `make` 命令：
+
+```
+make
+```
+
+
+
+
+
+
 
 ## CMake命令
 
@@ -11191,7 +11600,176 @@ add _executable
 
 
 
+# GIT
 
+## Git命令 
+
+查看本地全部分支 `git branch`
+
+切换分支 `git checkout feature`
+
+查看文件哪些被修改了 可以使用 `git status` 命令来查看哪些文件被修改过但还没有被提交，如果你想看修改的具体内容，可以使用 `git diff` 命令。
+
+提交暂存区`git add . ` `git commit -m "Your commit message"`
+
+提交变动,如果你想直接提交工作区的所有变动（修改，删除，重命名等），你可以直接使用 `git commit -a -m "Your commit message"`。 `-a` 或 `--all` 选项会自动把所有已经跟踪过的文件的变动（不包括新文件或删除的文件）暂存起来一并提交，省去了 `git add .` 这一步。注意这不包括新文件（需要用 `git add` 来跟踪新文件）。
+
+Git命令行工具提供了一系列命令来管理和操作Git仓库。以下是一些常用的Git命令：
+
+1. **设置与初始化**：
+   - `git init`: 初始化一个新的Git仓库。
+   - `git clone [url]`: 克隆（或下载）一个远程仓库到本地。
+2. **基础操作**：
+   - `git add [file/directory]`: 添加文件或目录到暂存区。
+   - `git commit -m "[message]"`: 提交暂存区的更改到仓库。
+   - `git status`: 显示工作区、暂存区和仓库的状态。
+   - `git log`: 查看提交历史。
+3. **分支与合并**：
+   - `git branch`: 列出所有分支。
+   - `git branch [branch_name]`: 创建一个新的分支。
+   - `git checkout [branch_name]`: 切换到指定分支。
+   - `git merge [branch_name]`: 合并指定分支到当前分支。
+4. **远程仓库操作**：
+   - `git remote add [name] [url]`: 添加一个新的远程仓库。
+   - `git fetch [remote_name]`: 从远程仓库下载对象和引用。
+   - `git push [remote_name] [branch_name]`: 将分支推送到远程仓库。
+   - `git pull [remote_name] [branch_name]`: 获取并合并远程仓库的更改。
+5. **撤销更改**：
+   - `git reset --hard [commit_hash]`: 重置到指定的提交。
+   - `git revert [commit_hash]`: 创建一个新的提交来撤销指定的提交。
+   - `git checkout -- [file]`: 丢弃工作区的更改。
+6. **高级功能**：
+   - `git rebase [branch_name]`: 将一系列提交重新应用到另一个基础点上。
+   - `git stash`: 临时保存工作区的更改。
+   - `git tag`: 创建、列出、删除或验证一个标签对象，通常用于版本发布。
+7. **配置与帮助**：
+   - `git config`: 获取和设置配置变量。
+   - `git help [command]`: 显示命令的帮助文档。
+
+**git commit**:
+
+- **这是一个本地操作。当你在工作目录中进行了一些修改并通过 `git add` 将它们添加到暂存区后，使用 `git commit` 将暂存区的更改提交到本地存储库。**提交时，你需要提供一个描述性的消息，描述此次更改的内容或原因。
+- 每次提交都会生成一个唯一的提交 ID，这允许你回溯或引用特定的提交。
+
+**git push**:
+
+- **这是一个远程操作。使用 `git push`，你可以将本地仓库的更改推送到远程仓库。**通常，这意味着将你的代码推送到像 GitHub 或 GitLab 这样的远程服务上。
+- 如果有其他开发者也在同一时间段推送了他们的更改，你可能需要首先拉取他们的更改 (`git pull`) 并解决任何潜在的合并冲突。
+
+**为什么要设置一个暂存区**
+
+暂存区是 Git 的一个独特特性，它为开发者提供了一个灵活的中间层，允许他们有选择性地提交更改。以下是设置暂存区的主要原因：
+
+1. **有选择性的提交**：不是所有的更改都需要成为一个提交。有时，你可能只想提交特定文件或更改，而不是工作目录中的所有更改。
+2. **组织清晰的提交**：暂存区允许你创建明确、目的明确的提交。例如，如果你修复了两个不相关的问题，你可以为每个问题创建一个单独的提交，而不是将它们混合在一起。
+3. **代码审查**：在提交之前，你可以使用 `git diff --staged` 检查哪些更改即将被提交。这可以帮助你确保只有预期的更改被提交，而不是意外的更改。
+4. **更好的撤销机制**：如果你意识到你的更改存在问题，你可以轻松地使用 `git reset` 从暂存区中撤销它，而不影响工作目录中的其他更改。
+5. 
+
+## 如何将本地项目上传到git？
+
+```shell
+git pull origin master(或者分支名)		 
+//push前最好切换到主分支使用pull来拉取下最新资源。避免冲突
+git init		
+//初始化版本库
+git add .		
+//添加到缓存区中
+git commit -m 'first commit'	
+//提交到版本库，并注释
+git push -u origin master(或者分支名)	
+//第一次推送时候要写
+git push origin master(或者分支名)     
+//如果不是第一次，则直接使用该命令即可推送修改
+```
+
+## git常用命令
+
+```shell
+//新建分支
+git branch 分支名
+//切换分支
+git checkout 分支名
+//删除本地分支
+git branch -d 分支名
+//强制删除本地分支
+git branch -D 分支名
+//删除远程分支
+git push origin --delete 分支名
+
+//查看本地所有分支
+git branch
+//查看远程所有分支
+git branch -r
+//查看远程和本地所有分支—一般用这个
+git branch -a
+
+//重命名本地分支
+git branch -m <oldbranch> <newbranch>
+```
+
+## push和pull
+
+**push：**本地分支合并到远程分支
+
+**pull：**将远程分支合并到本地分支
+
+## git fetch&git pull详解
+
+`git fetch`的意思是将远程主机的最新内容拉到本地，用户再检查无误后再决定是否合并到工作本地分支中
+
+`git pull`是将远程主机中的最新内容拉取下来后直接合并，即：git pull = git fetch+git merge，这样可能会产生冲突，需要手动解决。
+
+## git冲突原因和解决冲突
+
+**产生原因：**多个开发者同时使用或者操作git中的同一个文件，最后在依次提交commit和推送push的时候，第一个操作的是可以正常提交的，而之后的开发者想要执行pull和fetch操作的时候，就会报冲突异常conflict。
+
+1. 两个分支中修改了同一个文件（不管什么地方）
+2. 两个分支中修改了同一个文件的名称
+
+**冲突消除的方式：**
+
+1. git pull命令。拉取远程分支上的代码并合并到本地分支，目的是消除冲突；
+2. git stash命令。把工作区的修改提交到栈区，目的是保存工作区的修改；
+
+## git撤销commit但是未git push的情况
+
+```shell
+//找到上次git commit的id
+git log
+//执行撤销操作，同时将代码恢复到该commit_id之前的代码提交状态
+git reset --hard  commit_id
+//执行撤销但是保留更改
+git reset  commit_id
+```
+
+## git rebase和git merge
+
+合并前有两个分支：
+
+```shell
+A <- B <- C    [master]
+^
+ \
+  D <- E       [branch]
+```
+
+在 git merge master 之后：
+
+```
+A <- B <- C
+^         ^
+ \         \
+  D <- E <- F
+```
+
+在 git rebase master 之后：
+
+```
+A <- B <- C <- D <- E
+```
+
+rebase变基会破坏分支
 
 # Shell
 
@@ -11199,39 +11777,71 @@ add _executable
 
 awk用于在linux/unix下对文本和数据进行处理。它处理的数据可以来自标准输入(stdin)、一个或多个文件，或其它命令的输出等。它支持用户自定义函数和动态正则表达式等先进功能，是linux/unix下的一个强大编程工具。它在命令行中使用，但更多是作为脚本来使用。
 
-awk工作流程是这样的：读入有\n换行符分割的一条记录，然后将记录按指定的域分隔符划分域，填充域，`$0`则表示所有域,`$1`表示第一个域,`$n`表示第n个域。默认域分隔符是"空白键" 或 "[tab]键"，举个例子：
+**`awk` 是一个强大的文本处理工具**，常用于模式扫描和处理。`awk` 在命令行中工作，提供了强大的编程功能，如变量、逻辑控制结构、算术运算和内建函数等。它非常适用于对结构化文本数据（如CSV、TSV等格式）进行处理。
 
-```bash
-[root@www ~]# last -n 5 <==仅取出前五行
-root     pts/1   192.168.1.100  Tue Feb 10 11:21   still logged in
-root     pts/1   192.168.1.100  Tue Feb 10 00:46 - 02:28  (01:41)
-root     pts/1   192.168.1.100  Mon Feb  9 11:41 - 18:30  (06:48)
-dmtsai   pts/1   192.168.1.100  Mon Feb  9 11:41 - 11:41  (00:00)
-root     tty1                   Fri Sep  5 14:09 - 14:10  (00:01)
-```
-
-如果只是显示最近登录的5个帐号
+### 基本语法：
 
 ```
-#last -n 5 | awk  '{print $1}'
-root
-root
-root
-dmtsai
-root
+awk 'pattern { action }' filename
 ```
 
-所以`$1`表示登录用户，`$3`表示登录用户ip,以此类推。
+- `pattern`：一个正则表达式，只有匹配了这个正则表达式的行才会被处理。如果省略，所有行都会被处理。
+- `action`：一系列命令，用花括号括起来。这些命令会对匹配`pattern`的每一行执行。
+- `filename`：待处理的文件名。
 
-比如下列代码：
+### 特殊变量：
 
-```shell
-awk '{printf "第一列：%s 第二列：%s\n",$1,$2}' #在控制台输入两个信息，然后输出
-melon water
-第一列：melon 第二列：water
-```
+- `$0`：整个当前行。
+- `$1, $2, ...`：当前行的第一列、第二列等。
+- `NF`：当前行的字段数量（列数）。
+- `NR`：当前处理到的行号。
+- `FS`：字段分隔符，默认是空格。
 
-1
+### 示例：
+
+1. **打印文件的每一行**:
+
+   ```
+   awk '{ print $0 }' filename
+   ```
+
+2. **打印文件的第一列**:
+
+   ```
+   awk '{ print $1 }' filename
+   ```
+
+3. **将文件的每一行的第一列和第二列互换位置**:
+
+   ```
+   awk '{ print $2, $1 }' filename
+   ```
+
+4. **只打印包含"pattern"的行**:
+
+   ```
+   awk '/pattern/ { print $0 }' filename
+   ```
+
+5. **累加文件第一列的总和**:
+
+   ```
+   awk '{ sum += $1 } END { print sum }' filename
+   ```
+
+6. **打印每一行的字段数量**:
+
+   ```
+   awk '{ print NF }' filename
+   ```
+
+7. **使用逗号作为字段分隔符**:
+
+   ```
+   awk -F, '{ print $1 }' filename
+   ```
+
+
 
 ## 一些语法
 
@@ -11385,706 +11995,170 @@ melon water
 
 
 
+# QPS和TPS
 
+QPS（Queries Per Second）和 TPS（Transactions Per Second）是用来衡量系统处理能力的指标。
 
-## Git命令 
-
-查看本地全部分支 `git branch`
-
-切换分支 `git checkout feature`
-
-查看文件哪些被修改了 可以使用 `git status` 命令来查看哪些文件被修改过但还没有被提交，如果你想看修改的具体内容，可以使用 `git diff` 命令。
-
-提交暂存区`git add . ` `git commit -m "Your commit message"`
+QPS 表示**每秒钟处理的请求数量**，通常用于**衡量系统的网络吞吐量**。TPS 则表示**每秒钟完成的事务数量**，通常用于**衡量系统的事务处理能力**。
 
-提交变动,如果你想直接提交工作区的所有变动（修改，删除，重命名等），你可以直接使用 `git commit -a -m "Your commit message"`。 `-a` 或 `--all` 选项会自动把所有已经跟踪过的文件的变动（不包括新文件或删除的文件）暂存起来一并提交，省去了 `git add .` 这一步。注意这不包括新文件（需要用 `git add` 来跟踪新文件）。
+`QPS = 总请求次数/时间`
 
-Git命令行工具提供了一系列命令来管理和操作Git仓库。以下是一些常用的Git命令：
 
-1. **设置与初始化**：
-   - `git init`: 初始化一个新的Git仓库。
-   - `git clone [url]`: 克隆（或下载）一个远程仓库到本地。
-2. **基础操作**：
-   - `git add [file/directory]`: 添加文件或目录到暂存区。
-   - `git commit -m "[message]"`: 提交暂存区的更改到仓库。
-   - `git status`: 显示工作区、暂存区和仓库的状态。
-   - `git log`: 查看提交历史。
-3. **分支与合并**：
-   - `git branch`: 列出所有分支。
-   - `git branch [branch_name]`: 创建一个新的分支。
-   - `git checkout [branch_name]`: 切换到指定分支。
-   - `git merge [branch_name]`: 合并指定分支到当前分支。
-4. **远程仓库操作**：
-   - `git remote add [name] [url]`: 添加一个新的远程仓库。
-   - `git fetch [remote_name]`: 从远程仓库下载对象和引用。
-   - `git push [remote_name] [branch_name]`: 将分支推送到远程仓库。
-   - `git pull [remote_name] [branch_name]`: 获取并合并远程仓库的更改。
-5. **撤销更改**：
-   - `git reset --hard [commit_hash]`: 重置到指定的提交。
-   - `git revert [commit_hash]`: 创建一个新的提交来撤销指定的提交。
-   - `git checkout -- [file]`: 丢弃工作区的更改。
-6. **高级功能**：
-   - `git rebase [branch_name]`: 将一系列提交重新应用到另一个基础点上。
-   - `git stash`: 临时保存工作区的更改。
-   - `git tag`: 创建、列出、删除或验证一个标签对象，通常用于版本发布。
-7. **配置与帮助**：
-   - `git config`: 获取和设置配置变量。
-   - `git help [command]`: 显示命令的帮助文档。
 
-**git commit**:
 
-- **这是一个本地操作。当你在工作目录中进行了一些修改并通过 `git add` 将它们添加到暂存区后，使用 `git commit` 将暂存区的更改提交到本地存储库。**提交时，你需要提供一个描述性的消息，描述此次更改的内容或原因。
-- 每次提交都会生成一个唯一的提交 ID，这允许你回溯或引用特定的提交。
 
-**git push**:
 
-- **这是一个远程操作。使用 `git push`，你可以将本地仓库的更改推送到远程仓库。**通常，这意味着将你的代码推送到像 GitHub 或 GitLab 这样的远程服务上。
-- 如果有其他开发者也在同一时间段推送了他们的更改，你可能需要首先拉取他们的更改 (`git pull`) 并解决任何潜在的合并冲突。
 
-**为什么要设置一个暂存区**：
 
-暂存区是 Git 的一个独特特性，它为开发者提供了一个灵活的中间层，允许他们有选择性地提交更改。以下是设置暂存区的主要原因：
 
-1. **有选择性的提交**：不是所有的更改都需要成为一个提交。有时，你可能只想提交特定文件或更改，而不是工作目录中的所有更改。
-2. **组织清晰的提交**：暂存区允许你创建明确、目的明确的提交。例如，如果你修复了两个不相关的问题，你可以为每个问题创建一个单独的提交，而不是将它们混合在一起。
-3. **代码审查**：在提交之前，你可以使用 `git diff --staged` 检查哪些更改即将被提交。这可以帮助你确保只有预期的更改被提交，而不是意外的更改。
-4. **更好的撤销机制**：如果你意识到你的更改存在问题，你可以轻松地使用 `git reset` 从暂存区中撤销它，而不影响工作目录中的其他更改。
 
-# GIT
 
-## 如何将本地项目上传到git？
 
-```shell
-git pull origin master(或者分支名)		 //push前最好切换到主分支使用pull来拉取下最新资源。避免冲突
-git init		//初始化版本库
-git add .		//添加到缓存区中
-git commit -m 'first commit'	//提交到版本库，并注释
-git push -u origin master(或者分支名)	//第一次推送时候要写
-git push origin master(或者分支名)     //如果不是第一次，则直接使用该命令即可推送修改
-```
 
-## git常用命令
 
-```shell
-//新建分支
-git branch 分支名
-//切换分支
-git checkout 分支名
-//删除本地分支
-git branch -d 分支名
-//强制删除本地分支
-git branch -D 分支名
-//删除远程分支
-git push origin --delete 分支名
 
-//查看本地所有分支
-git branch
-//查看远程所有分支
-git branch -r
-//查看远程和本地所有分支—一般用这个
-git branch -a
 
-//重命名本地分支
-git branch -m <oldbranch> <newbranch>
-```
 
-## push和pull
+# Docker
 
-**push：**本地分支合并到远程分支
+### 概念
 
-**pull：**将远程分支合并到本地分支
+- Docker是一个开源的应用容器引擎，诞生于2013年初，基于Go语言实现，dotCloud公司出品（后改名Docker Inc）
+- Docker可以让开发者打包他们的应用以及依赖包到一个轻量级、可移植的容器中，然后发布到任何流行的Linux机器上
+- 容器是完全使用沙箱机制，相互隔离
+- 容器性能开销极低
+- docker是一种容器技术，解决了软件跨环境迁移的这么一个问题
 
-## git fetch&git pull详解
+### 架构
 
-[参考链接和评论](https://blog.csdn.net/weixin_41975655/article/details/82887273)
+- 镜像（Image）：Docker镜像（Image），就相当于是一个root文件系统。比如官方镜像 ubuntu:16.04就包含了完整的一套Ubuntu16.04最小系统的root文件系统
+- 容器（Container）：镜像（Image）和容器（Container）的关系，就像是面向对象程序设计中的类和对象一样，镜像是静态的定义，容器是镜像运行时的实体。容器可以被创建、启动、停止、删除、暂停等
+- 仓库（Repository）：仓库可以看成一个代码控制中心，用来保存镜像
 
-`git fetch`的意思是将远程主机的最新内容拉到本地，用户再检查无误后再决定是否合并到工作本地分支中
+### Docker服务命令
 
-`git pull`是将远程主机中的最新内容拉取下来后直接合并，即：git pull = git fetch+git merge，这样可能会产生冲突，需要手动解决。
+### Docker 服务相关命令
 
-## git冲突原因和解决冲突
+- 启动docker 服务：
 
-**产生原因：**多个开发者同时使用或者操作git中的同一个文件，最后在依次提交commit和推送push的时候，第一个操作的是可以正常提交的，而之后的开发者想要执行pull和fetch操作的时候，就会报冲突异常conflict。
+  - ```shell
+    systemctl start docker
+    ```
 
-1. 两个分支中修改了同一个文件（不管什么地方）
-2. 两个分支中修改了同一个文件的名称
+- 停止docker 服务：
 
-**冲突消除的方式：**
+  - ```shell
+    systemctl stop docker
+    ```
 
-1. git pull命令。拉取远程分支上的代码并合并到本地分支，目的是消除冲突；
-2. git stash命令。把工作区的修改提交到栈区，目的是保存工作区的修改；
+- 重启docker 服务：
 
-## git撤销commit但是未git push的情况（**如在 Git 恢复先前的提交？**）
+  - ```shell
+    systemctl restart docker
+    ```
 
-```shell
-//找到上次git commit的id
-git log
-//执行撤销操作，同时将代码恢复到该commit_id之前的代码提交状态
-git reset --hard  commit_id
-//执行撤销但是保留更改
-git reset  commit_id
-```
+- 查看docker 服务状态：
 
-## git rebase和git merge
+  - ```shell
+    systemctl status docker
+    ```
 
-合并前有两个分支：
+- 设置开机启动docker：
 
-```shell
-A <- B <- C    [master]
-^
- \
-  D <- E       [branch]
-```
+  - ```shell
+    systemctl enable docker
+    ```
 
 
 
-在 git merge master 之后：
+### 2.2 Docker 镜像相关命令
 
-```
-A <- B <- C
-^         ^
- \         \
-  D <- E <- F
-```
+- 查看镜像：查看本地所有的镜像
 
-在 git rebase master 之后：
+  - ```shell
+    docker images
+    docker images -q #查看所有镜像的id
+    ```
 
-```
-A <- B <- C <- D <- E
-```
+- 搜索镜像：从网络中查找需要的镜像
 
-rebase变基会破坏分支
+  - ```shel
+    docker search 镜像名称
+    ```
 
-# GDB
+- 拉取镜像：从Docker 仓库下载镜像到本地，镜像名称格式为`名称:版本号`，如果版本号不指定则是最新的版本。如果不知道镜像版本，可以去docker hub 搜索对应镜像查看
 
-## gdb使用流程
+  - ```shell
+    docker pull 镜像名称
+    ```
 
-- 启动gdb  -g表示调试
-- list查看代码，默认查看10行
-- run(或者写成r)，没有断点就运行到结束，有断点就运行到断点处
-- start：程序从`main`函数的起始位置停下，开始逐步调试。
-- break(b)，设置断点
-- info break：查看断点信息
-- delete：删除断点
-- continue、step、next命令
-  1. continue：继续执行程序，直到遇到下一个断点或者结束
-  2. next：单步执行，遇到函数时会跳过函数，不进入函数体内部
-  3. step：单步执行程序，但遇到函数会进入到函数内部
-- until：结束一个循环体循环
-- print：显示变量或者表达式的值
+- 删除镜像：删除本地镜像
 
-## 普通调试
+  - ```shell
+    docker rmi 镜像id/名称号:版本号 #删除指定本地镜像
+    docker rmi 'docker images -q' #删除所有本地镜像
+    ```
 
-- step和next的区别？
 
-​		next会直接执行到下一句 ,step会进入函数体内部执行
 
-- list
+### 2.3 Docker 容器相关命令
 
-​		查看源码
+- 查看容器
 
-- set
+  - ```shell
+    docker ps #查看正在运行的容器
+    docker ps -a #查看所有容器
+    ```
 
-  设置变量值
+- 创建并启动容器
 
-- backtrace 
+  - ```shell
+    docker run 参数 版本:版本号 </bin/bash>#默认为/bin/bash
+    ```
 
-  查看函数调用的栈帧关系
+  - 参数说明：
 
-- framework
+    - `-i`：保持容器运行。通常与`-t`同时使用。加入`it`这两个参数后，容器创建后自动进入容器中，退出容器后，容器自动关闭
+    - `-t`：为容器重新分配一个伪输入终端，通常与`-i`同时使用
+    - `-d`：以守护（后台）模式运行容器。创建一个容器在后台运行，需要使用`docker exec`进入容器`docker exec -it c2 /bin/bash`。退出后，容器不会关闭
+    - `-it`创建的容器一般称为交互式容器；`-id`创建的容器一般称为守护式容器
+    - `--name`：为创建的容器命名
 
-  切换函数栈帧
+- 进入容器
 
-- info
+  - ```shell
+    docker exec 参数 #退出容器，容器不会关闭
+    ```
 
-  查看函数内部局部变量
+- 停止容器
 
-## 多线程调试
+  - ```shell
+    docker stop 容器名称
+    ```
 
-<img src="https://cdn.jsdelivr.net/gh/luogou/cloudimg/data/202203151449773.png" alt="这里写图片描述" style="zoom: 80%;float:left" />
+- 启动容器
 
-- info threads
+  - ```shell
+    docker start 容器名称
+    ```
 
-  查看所有线程，默认分支是主线程
+- 删除容器：如果容器是运行状态则删除失败，需要停止容器参能删除
 
-- thread id
+  - ```shel
+    docker rm 容器名称
+    ```
 
-  切换线程
+- 查看容器信息
 
-- bt
+  - ```shell
+    docker inspect 容器名称
+    ```
 
-  查看每个线程的栈帧然后设置断点
 
-- thread apply （n或all） 命令
 
-  使用thread apply来让一个或是多个线程执行指定的命令。例如让所有的线程打印调用栈信息。
 
-- set scheduler-locking on
 
-  锁定只有当前的线程能够执行
 
 
 
-## 多线程调试2
 
-在 Linux 下，你可以使用许多工具来调试多线程的程序，其中最常用的是 GDB 和 Valgrind。这两种工具都非常强大，可以帮助你找出并解决各种问题。
-
-1. GDB: GDB 是一个开源的调试器，支持 C 和 C++ 等语言。GDB 提供了多线程调试的功能，让你可以查看、停止和控制程序中的每一个线程。
-   - 使用 "info threads" 命令可以显示当前程序中所有线程的信息。
-   - 使用 "thread num" 命令可以切换到指定的线程，其中 "num" 是线程的编号。
-   - 使用 "break filename:linenum" 命令可以在指定的文件和行设置断点。
-   - 使用 "run" 命令可以开始运行程序，当遇到断点时程序会停止，并显示当前的调用堆栈和变量值。
-
-
-
-
-
-## GDB工作原理
-
-1. **编译程序**: 要使用GDB调试程序，首先需要使用编译器（如GCC）编译源代码，通常需要在编译过程中包含调试信息（例如，使用`-g`选项），以便GDB能够理解源代码和机器代码之间的映射关系。
-
-2. **启动GDB**: 在终端中运行GDB，然后通过命令行将待调试的程序作为参数传递给GDB。例如，使用以下命令启动GDB并调试一个名为`my_program`的程序：
-
-   ```
-   Copy code
-   gdb my_program
-   ```
-
-3. **设置断点**: GDB允许您在程序中设置断点，以在特定位置停止程序的执行。您可以使用`break`命令设置断点，指定要在哪个源代码行或函数中停止。例如：
-
-   ```
-   kotlinCopy code
-   break main
-   ```
-
-4. **运行程序**: 使用`run`命令开始执行程序，直到遇到设置的断点或程序结束。例如：
-
-   ```
-   arduinoCopy code
-   run
-   ```
-
-5. **调试控制**: 一旦程序停止，您可以使用各种GDB命令来检查程序状态。一些常用的命令包括：
-
-   - `step`：逐行执行程序，进入函数调用。
-   - `next`：逐行执行程序，跳过函数调用。
-   - `continue`：继续执行程序，直到下一个断点。
-   - `print`：用于查看变量的值。
-   - `backtrace`：显示函数调用堆栈。
-
-6. **观察程序状态**: 使用GDB，您可以查看程序的变量、寄存器状态、内存内容等，以帮助诊断问题。
-
-7. **修改程序状态**: 在某些情况下，您可以使用GDB来修改程序的状态，例如，更改变量的值，然后继续执行程序。
-
-8. **终止调试**: 调试完成后，您可以使用`quit`命令退出GDB。
-
-
-
-
-
-# 智力题
-
-### 有8个球，其中一个球比其他重一些，天平称重几次可以找到
-
-第一次：把8个球分为三组，每组分别为3个，3个，2个。然后把两个3个球的组放在天平两端进行称重。如果天平平衡，那么较重的球就在剩下的2个球中；如果不平衡，较重的球就在较重的那一端的3个球中。
-
-第二次：在两个球的情况下，直接进行称重就可以找出较重的那个。在三个球的情况下，选取其中的两个球进行称重，如果平衡，那么较重的球就是未称的那个，否则较重的球就是天平较重的那一端的球。
-
-
-
-
-
-
-
-# 手写线程池
-
-```c++
-#include <list>
-#include <stdexcept>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-
-class ThreadPool {
-public:
-    ThreadPool(int thread_number = 8, int max_requests = 10000)
-        : m_thread_number(thread_number), m_max_requests(max_requests), m_stop(false) {
-        if (thread_number <= 0 || max_requests <= 0)
-            throw std::runtime_error("invalid thread_number or max_requests");
-
-        for (int i = 0; i < m_thread_number; ++i)
-            m_threads.emplace_back(worker, this);
-    }
-
-    ~ThreadPool() {
-        {
-            std::unique_lock<std::mutex> lock(m_queuelocker);
-            m_stop = true;
-        }
-        m_queuestat.notify_all();
-        for(std::thread &worker: m_threads)
-            worker.join();
-    }
-
-    bool append(std::function<void()> task) {
-        {
-            std::unique_lock<std::mutex> lock(m_queuelocker);
-            if (m_workqueue.size() >= m_max_requests)
-                return false;
-            m_workqueue.push_back(std::move(task));
-        }
-        m_queuestat.notify_one();
-        return true;
-    }
-
-    static void worker(ThreadPool *pool) {
-        pool->run();
-    }
-
-    void run() {
-        while (!m_stop) {
-            std::function<void()> task;
-            {
-                std::unique_lock<std::mutex> lock(m_queuelocker);
-                m_queuestat.wait(lock, [this]{ return m_stop || !m_workqueue.empty(); });
-                if (m_stop && m_workqueue.empty())
-                    return;
-                task = std::move(m_workqueue.front());
-                m_workqueue.pop_front();
-            }
-            if (task)
-                task();
-        }
-    }
-
-private:
-    int m_thread_number;
-    int m_max_requests;
-    std::vector<std::thread> m_threads;
-    std::list<std::function<void()>> m_workqueue;
-    std::mutex m_queuelocker;
-    std::condition_variable m_queuestat;
-    bool m_stop;
-};
-```
-
-当你写`m_workqueue.push_back(std::move(task));`时，你实际上是在说：“我不再需要这个任务，你可以将其资源直接移动到工作队列中，无需复制。”这样，当你的任务对象较大或持有大量资源时，你可以避免不必要的复制，从而提高性能。
-
-```c++
-#include <iostream>
-#include <chrono>
-#include <string>
-
-int main() {
-    // 创建一个拥有4个线程的线程池
-    ThreadPool pool(4);
-
-    // 创建一些任务并添加到线程池
-    for (int i = 0; i < 10; ++i) {
-        pool.append([i]() {
-            std::cout << "Hello from task " << i << " on thread " << std::this_thread::get_id() << std::endl;
-            // 模拟耗时操作
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        });
-    }
-
-    // 等待所有任务完成。这只是为了让主线程暂停，让工作线程有机会完成他们的任务。
-    std::this_thread::sleep_for(std::chrono::seconds(12));
-
-    return 0;
-}
-
-```
-
-
-
-
-
-
-
-## Socket编程API以及Socket编程返回值
-
-1. **socket()**
-   创建一个新的套接字。
-
-   ```C++
-   int socket(int domain, int type, int protocol);
-   ```
-
-2. **bind()**
-   将套接字绑定到特定的地址和端口。
-
-   ```C++
-   int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-   ```
-
-3. **listen()**
-   让套接字进入监听模式，等待连接请求。
-
-   ```C++
-   int listen(int sockfd, int backlog);
-   ```
-
-4. **accept()**
-   接受来自客户端的连接请求。
-
-   ```C++
-   int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-   ```
-
-5. **connect()**
-   尝试与服务器端的套接字建立连接。
-
-   ```C++
-   int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-   ```
-
-6. **send()**, **recv()**
-   用于发送和接收数据。
-
-   ```C++
-   ssize_t send(int sockfd, const void *buf, size_t len, int flags);
-   ssize_t recv(int sockfd, void *buf, size_t len, int flags);
-   ```
-
-7. **sendto()**, **recvfrom()**
-   用于无连接的数据传输（例如UDP）。
-
-   ```C++
-   ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
-   
-   ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
-   ```
-
-8. **close()**
-   用于关闭套接字。
-
-   ```c++
-   int close(int fd);
-   ```
-
-9. **getaddrinfo()**, **freeaddrinfo()**, **gai_strerror()**
-
-   这些函数用于DNS查找，将域名转换为套接字地址结构。
-
-   ```C++
-   int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
-   
-   void freeaddrinfo(struct addrinfo *res);
-   
-   const char *gai_strerror(int errcode);
-   ```
-
-   **setsockopt()**, **getsockopt()**
-   设置或获取套接字选项。
-
-   ```c++
-   cCopy codeint setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
-   
-   int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
-   ```
-
-### 返回值:
-
-大多数Socket API函数在成功时返回非负值，但在出错时返回-1。当这些函数返回-1时，可以使用`errno`来确定发生了什么错误，并使用`perror()`或`strerror(errno)`来获取描述性的错误消息。
-
-例如：
-
-```c++
-if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-    perror("bind");
-    // 或者: printf("bind: %s\n", strerror(errno));
-    exit(1);
-}
-```
-
-`accept()`, `recv()`, `send()`, `recvfrom()`, 和 `sendto()` 这些函数返回的是其他特定的值，如传输的字节数，或者在错误时返回-1。
-
-当处理Sockets和网络错误时，了解可能的`errno`值是很有帮助的，如`ECONNREFUSED`, `ETIMEDOUT`, `EHOSTUNREACH`等。
-
-总的来说，这只是Socket编程API的一个简单概述，实际应用中还有许多细节和额外的功能需要深入了解。
-
-
-
-
-
-## 单核cpu能否运行多线程
-
-**对于单核CPU来说，它不能真正地同时执行多个线程。实际上，它是通过时间片轮转（time slicing）或其他调度策略来快速切换不同线程的执行，给人一种并行执行的错觉。**
-
-操作系统的调度器会控制线程的执行，并决定哪个线程应该在何时运行。当一个线程的时间片用完或者它被阻塞（例如，等待I/O操作完成）时，操作系统会保存它的状态（称为上下文切换），然后选择另一个线程运行。
-
-这种方式的优点是可以提高CPU的利用率，因为当一些线程在等待I/O操作时，其他的线程可以继续执行。而且，由于线程的切换非常快，用户通常感觉不到切换的存在，就像多个线程或任务在同时运行一样。但是，它也会带来一定的开销，比如上下文切换的时间和资源。
-
-另外，虽然单核CPU可以运行多线程，但是多核CPU会提供更好的并行性能，因为它们可以真正地同时执行多个线程。
-
-
-
-
-
-## 游戏战力排行榜榜单用什么数据结构存储
-
-可以同时使用优先队列和哈希表，优先队列(堆)用于维护前 K 个最强的玩家，哈希表用于快速查找任意玩家的排名。
-
-
-
-
-
-
-
-## 模版写在.h不写在.cpp
-
-1. **编译时实例化**：C++的模板不同于常规的函数或类。模板是在编译时实例化的，这意味着当你使用一个模板（例如`std::vector<int>`）时，编译器实际上为你生成了一个与该特定类型相关的新代码版本（在这个例子中，它是与`int`类型相关的`std::vector`版本）。为了进行此操作，编译器需要完整地看到模板的定义。
-2. **分离的编译模型**：在传统的C++编译模型中，每个`.cpp`文件被单独编译成目标文件。编译器在编译一个`.cpp`文件时通常不会查看其他`.cpp`文件。因此，如果模板定义位于某个`.cpp`文件中，其他`.cpp`文件中的模板实例化将无法访问到该定义，导致链接错误。
-   **总结：因为模版是在编译时候实例化的，如果你写在.cpp文件中，.cpp是单独编译的，这样其他的文件就看不到这个文件的模版的定义，就不能实例化**
-
-## bind绑定
-
-在C++中，**`bind`是一种函数模板，它返回一个函数对象**，这个对象能将其参数与给定的值或函数对象绑定在一起。`std::bind`可以创建一个可以调用的对象，这个对象在被调用时会将预先绑定的参数传递给预先绑定的函数。
-
-```c++
-#include <iostream>
-#include <functional> // for std::bind
-
-void print_number(int number) {
-    std::cout << number << std::endl;
-}
-
-int main() {
-    auto bound_print_number = std::bind(print_number, 5);
-    bound_print_number(); // 输出5
-}
-
-```
-
-在这个例子中，我们首先定义了一个函数`print_number`，它接受一个整数参数并将其打印出来。然后我们使用`std::bind`来创建一个新的可调用对象`bound_print_number`，这个对象在被调用时会自动将5作为参数传递给`print_number`函数。
-
-我们也可以使用`std::placeholders`占位符来表示将来在调用时提供的参数。例如：
-
-```c++
-#include <iostream>
-#include <functional> // for std::bind and std::placeholders
-
-void print_sum(int a, int b) {
-    std::cout << a + b << std::endl;
-}
-
-int main() {
-    auto bound_print_sum = std::bind(print_sum, std::placeholders::_1, 5);
-    bound_print_sum(3); // 输出8
-}
-```
-
-在这个例子中，我们使用`std::placeholders::_1`来表示在调用`bound_print_sum`时提供的第一个参数。所以，当我们调用`bound_print_sum(3)`时，它实际上调用的是`print_sum(3, 5)`，并输出8。
-
-
-
-
-
-## 回调函数：
-
-当发⽣某种事件时，系统或其他函数将会⾃动调⽤你定义的⼀段函数；
-
-回调函数就相当于⼀个中断处理函数，由系统在符合你设定的条件时⾃动调⽤。为此，你需要做三件事：1，声明；2，定义；3，设置触发条件，就是在你的函数中把你的回调函数名称转化为地址作为⼀个参数，以便于系统调⽤；
-
-回调函数就是⼀个通过函数指针调⽤的函数。如果你把函数的指针（地址）作为参数传递给另⼀个函数，当这个指针被⽤为调⽤它所指向的函数时，我们就说这是回调函数；
-
-因为可以把调⽤者与被调⽤者分开。调⽤者不关⼼谁是被调⽤者，所有它需知道的，只是存在⼀个具有某种特定原型、某些限制条件（如返回值为int）的被调⽤函数。
-
-
-
-
-
-
-
-
-
-## bind和function配套使用
-
-`std::function`是C++11引入的一个类型，可以被用来存储任何可以调用的目标，包括函数、Lambda表达式、函数指针或者有`operator()`的类的实例。`std::function`经常和`std::bind`一起使用。
-
-```c++
-#include <iostream>
-#include <functional>
-
-void print_number(int number) {
-    std::cout << number << std::endl;
-}
-
-int main() {
-    std::function<void(int)> func = print_number;
-    func(5);  // 输出：5
-
-    auto bound_print_number = std::bind(print_number, 7);
-    std::function<void()> func_bound = bound_print_number;
-    func_bound();  // 输出：7
-}
-```
-
-在这个例子中，我们首先创建了一个`std::function`对象`func`，并将其初始化为`print_number`函数。然后我们调用`func(5)`，这将打印出5。
-
-然后我们使用`std::bind`创建了一个可调用对象`bound_print_number`，并将参数7绑定到`print_number`函数上。接着我们创建了一个`std::function`对象`func_bound`，并将其初始化为`bound_print_number`。最后，我们调用`func_bound()`，这将打印出7。
-
-这就是`std::function`和`std::bind`一起使用的方式。**你可以使用`std::function`来存储`std::bind`返回的可调用对象，然后在需要的时候调用它。**
-
-
-
-## 句柄和指针的区别
-
-句柄和指针其实是两个截然不同的概念。Windows系统用句柄标记系统资源，隐藏系统的信息。你只要知道有这个东西，然后去调用就行了，它是个32bit的uint。指针则标记某个物理内存地址，两者是不同的概念。
-
-## 贪心和动态规划
-
-**贪心**
-
-- 贪心算法是一种在问题求解时，**总是做出在当前看来是最好的选择。**也就是说，不从全局最优上加以考虑，它所做出的仅是在那个时刻下的局部最优解。
-- **贪心算法并不保证会达到全局最优。**在有些问题中，贪心策略的局部最优解能导致问题的全局最优解，例如在最小生成树问题中，但在一些问题中，贪心算法不能得到全局最优解，比如在背包问题中。所以，贪心算法的适用情况需要具体问题具体分析。
-- 对于贪心算法的时间复杂度，这要看具体问题的情况。在一些问题中，**贪心算法可以在线性时间内运行，即时间复杂度为O(n)。**但在其他问题中，比如最小生成树问题中，如果使用优先队列来获取下一个最小的边，那么时间复杂度可能为O(E log E)，其中E为图的边的数量。
-- 总的来说，贪心算法有一定的局限性，但如果应用得当，它可以高效地解决一些问题，并给出接近最优的解答。
-
-**动态规划**
-
-- 动态规划（Dynamic Programming，简称DP）是一种在数学、计算机科学和经济学中使用的，通过把原问题分解为相对简单的子问题的方式求解复杂问题的方法。
-- 动态规划通常用于优化递归问题，例如斐波那契数列问题，如果用递归的方法来求解，会重复计算很多相同的子问题，而动态规划则通过记忆已解决的子问题的答案来避免重复计算，从而提高了效率。
-- 动态规划的核心思想是记忆与迭代，通常依赖于所谓的状态转移方程。首先定义一个数组或者其他数据结构来存放子问题的解，然后基于这些已解决的子问题来解决更大的问题。
-- 举一个经典的例子，斐波那契数列的定义是F(n) = F(n-1) + F(n-2)对所有n>1，而F(0)=0，F(1)=1。如果用递归的方法来求解F(n)，会导致大量重复计算。但如果使用动态规划，我们可以从底向上的顺序计算并记忆F(2), F(3), ..., F(n)，每次只需要使用前两个已经计算出的值，避免了重复计算。
-- 动态规划的复杂度取决于你如何定义子问题和状态转移方程，但通常都会比纯粹的递归更高效。比如在斐波那契数列的例子中，动态规划的时间复杂度为O(n)，而递归的时间复杂度为O(2^n)。
-- 总的来说，动态规划是一种非常强大的工具，可以应用于很多优化问题，包括序列对齐、最长公共子序列、最短路径问题等等。
-
-## 调用函数时怎么知道函数地址的？
-
-**当你在代码中调用一个函数时，编译器生成的代码会引用这个函数的符号（例如，函数名）。然后，链接器负责把这个符号解析为具体的函数地址。**
-
-
-
-## HelloWorld程序开始到打印到屏幕上的全过程
-
-⽤户告诉操作系统执⾏ HelloWorld 程序（通过键盘输⼊等）；
-
-操作系统：找到 HelloWorld 程序的相关信息，检查其类型是否是可执⾏⽂件；并通过程序⾸部信息，确定代码和数据在可执⾏⽂件中的位置并计算出对应的磁盘块地址；
-
-操作系统：创建⼀个新进程，将 HelloWorld 可执⾏⽂件映射到该进程结构，表示由该进程执⾏ HelloWorld程序；
-
-操作系统：为 HelloWorld 程序设置 cpu 上下⽂环境，并跳到程序开始处；执⾏ HelloWorld 程序的第⼀条指令，发⽣缺⻚异常；
-
-操作系统：分配⼀⻚物理内存，并将代码从磁盘读⼊内存，然后继续执⾏ HelloWorld 程序;
-
-HelloWorld 程序执⾏ puts 函数（系统调⽤），在显示器上写⼀字符串;
-
-操作系统：找到要将字符串送往的显示设备，通常设备是由⼀个进程控制的，所以，操作系统将要写的字符串送给该进程;
-
-操作系统：控制设备的进程告诉设备的窗⼝系统，它要显示该字符串，窗⼝系统确定这是⼀个合法的操作，然后将字符串转换成像素，将像素写⼊设备的存储映像区;视频硬件将像素转换成显示器可接收和⼀组控制数据信号;显示器解释信号，激发液晶屏;
-
-OK，我们在屏幕上看到了 HelloWorld;
-
-## printf实现原理
-
-在C/C++中，对函数参数的扫描是从后向前的。C/C++的函数参数是通过压⼊堆栈的⽅式来给函数传参数的（堆栈是⼀种先进后出的数据结构）。
-
-最先压⼊的参数最后出来，在计算机的内存中，数据有 2 块，⼀块是堆，⼀块是栈（函数参数及局部变量在这⾥），⽽栈是从内存的⾼地址向低地址⽣⻓的，控制⽣⻓的就是堆栈指针了，最先压⼊的参数是在最上⾯，就是说
-
-在所有参数的最后⾯，最后压⼊的参数在最下⾯，结构上看起来是第⼀个，所以最后压⼊的参数总是能够被函数找到。
-
-因为它就在堆栈指针的上⽅。printf的第⼀个被找到的参数就是那个字符指针，就是被双引号括起来的那⼀部分，
-
-函数通过判断字符串⾥控制参数的个数来判断参数个数及数据类型，通过这些就可算出数据需要的堆栈指针的偏量了。
