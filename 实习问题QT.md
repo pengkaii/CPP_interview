@@ -2050,12 +2050,12 @@ connect() 函数的 method 参数还可以指定一个信号函数，也就是�
 
 
 
-## Headers
+## Headers头文件
 
 ```c++
 /最终将数据写入下位机和从下位机读出数据
 //controlcentral   
-1.com口的参数设置   
+1.con口的参数设置   
 2.读取传感器数据    
 3.
 //configdialog      1.将面板中设置好的通信格式参数送给controlcentral
@@ -2067,7 +2067,6 @@ connect() 函数的 method 参数还可以指定一个信号函数，也就是�
 2.改变每个关节坐标原点的位置和姿态
 
  //传感器函数关系  传感器的正负方向要和关节运动的正负方向相同
- 
  //旋转矩阵与欧拉轴，转角，四元数之间的相互转换
                    
 Headers
@@ -2101,7 +2100,7 @@ AutoGenerateTrajectory.cpp
 
 ```
 
-###  controlcentral.cpp
+###  controlcentral.cpp控制单元
 
 ```c++
  controlcentral.cpp
@@ -2133,7 +2132,7 @@ AutoGenerateTrajectory.cpp
     //调用逆运动学引擎提供的正向运动学计算末端点的位置
 ```
 
-#### glwidget.cpp
+#### glwidget.cpp图形渲染
 
 ```c++
 glwidget.cpp  
@@ -2178,7 +2177,7 @@ gui.cpp==看gui.h理解
 //总体来说，这个 gui 类似乎用于管理用户界面的各种操作、设置和状态。它通过信号和槽机制实现了用户界面与代码逻辑之间的通信和交互。这个类可能是在Qt框架中用于用户界面设计和操作的一部分。
 ```
 
-#### inversekinematicsengine.cpp
+#### inversekinematicsengine.cpp逆向运动学计算
 
 ```c++
 inversekinematicsengine.cpp//执行逆向运动学计算
@@ -2196,7 +2195,7 @@ inversekinematicsengine.cpp//执行逆向运动学计算
     //设置当前计算点的前一点的机器坐标值
 ```
 
-#### joystick.cpp
+#### joystick.cpp手柄检测
 
 ```c++
 joystick.cpp
@@ -2227,7 +2226,7 @@ int main(int argc, char *argv[])：这是主函数的定义，它接受命令行
 QApplication a(argc, argv);：创建了一个 QApplication 类的实例 a，并传递命令行参数给它，用于初始化 Qt 应用程序。
 ```
 
-#### mainwindow.cpp
+#### mainwindow.cpp主窗口
 
 ```c++
 mainwindow.cpp //初始化主窗口以及主窗口内各个部件的状态、样式、文本
@@ -2258,14 +2257,12 @@ void MainWindow::on_Start_clicked()
 //包含两个 MainWindow 类的槽函数，分别是 on_Simulator_clicked 和 on_Start_clicked，用于响应名为 Simulator 和 Start 的按钮的点击事件
 ```
 
-#### mycanthread.cpp
+#### mycanthread.cpp CAN通信
 
 ```c++
 mycanthread.cpp、mycanthread_recev.cpp(看代码更好)
     //connect(clock, SIGNAL(timeout()), this, SLOT(testConnectStatus())); 连接 clock 的超时信号到 MyCanThread 类的 testConnectStatus() 槽函数。
 // ReceiveCANThread();//接收CAN数据
-   
-    
     #include "mycanthread.h"
 #include <QDebug>
 
@@ -2531,24 +2528,25 @@ void MyCanThread::CloseCANThread()
 
 
 
-#### pwmAndVelocity() .cpp 
+#### pwmAndVelocity() .cpp 电机脉宽
 
 用于计算电机的脉宽调制（PWM）信号和速度的函数
 
-#### robotvisualisationwidget.cpp
+#### robotvisualisationwidget.cpp机器人可视化状态
 
 ```c++
 robotvisualisationwidget.cpp //机器人的可视化状态
     //绘制机械臂 位置
     // jointsPostures = rot;姿态
     // 更新关节的位置和姿态
-    // glRotatef(GLfloat(-(coords.f_1)*180/PI), 0.0, 1.0, 0.0);OpenGL中的旋转函数，根据角度进行旋转操作。实现机器人可视化中的姿态变换，以在三维空间中正确显示机器人的朝向
+    // glRotatef(GLfloat(-(coords.f_1)*180/PI), 0.0, 1.0, 0.0);
+    OpenGL中的旋转函数，根据角度进行旋转操作。实现机器人可视化中的姿态变换，以在三维空间中正确显示机器人的朝向
     //  glTranslatef(340.6f, 0.0, -45.25f);OpenGL中的平移函数，用于在三维空间中平移物体或模型。控制机器人可视化中的位置调整，以便在三维空间中正确放置机器人的位置
     //绘制末段点
     //绘制世界坐标系的XYZ轴
 ```
 
-#### sendmsg.cpp
+#### sendmsg.cpp发送CAN消息到下位机
 
 ```c++
 sendmsg.cpp  通信==用于发送 CAN 消息到下位机
@@ -2676,9 +2674,6 @@ bool sendMsg::getConnectStatus()// CAN 设备是否已连接
 
 重点：
 
-
-
-
 //发送 CAN 消息
 void sendMsg::sendMessage()
 {
@@ -2698,7 +2693,6 @@ void sendMsg::sendMessage()
 
     //将关节角和 PWM 数据发送到 CAN 总线上，以便与下位机进行通信和控制。每个数据包的格式都经过了转换，然后通过 sendThreadCAN1 对象的方法进行发送
     // PWM=脉冲宽度调制数据，用于控制电机的速度或位置
-    
      //先发送一帧数据给下位机，告诉下位机要开始接收数据，38 33 33 33 33 33 33 37
      for(int i = 0; i < 8; i++)
      {
@@ -2709,10 +2703,13 @@ void sendMsg::sendMessage()
 
      unsigned int pwm_ID = 10;//构造 PWM 数据的 ID
      for (int i=0;i < 6;i++) {
-        id = static_cast<unsigned int>(i + 1);        //ID: 1~6
+        id = static_cast<unsigned int>(i + 1);        
+         //ID: 1~6
         pwm_ID++;
-        sendData = makedata->rawData2sendData(joints[i]);//将关节角数据转换为发送给下位机的格式
-        sendData_pwm = makedata->rawData2sendData(pwm[i]);//将 PWM 数据转换为发送给下位机的格式
+        sendData = makedata->rawData2sendData(joints[i]);
+         //将关节角数据转换为发送给下位机的格式
+        sendData_pwm = makedata->rawData2sendData(pwm[i]);
+         //将 PWM 数据转换为发送给下位机的格式
         //qDebug() << "sendData " << sendData << endl;
         //makedata->receData2realData(sendData);
         //qDebug() << "realJoint " << makedata->getRealValue();
@@ -2807,7 +2804,7 @@ void sendMsg::sendAUTOmess(){
 int sendMsg::hex_str_to_int(unsigned char *ch)
 ```
 
-#### timingtransmitter.cpp
+#### timingtransmitter.cpp定时发送控制信号
 
 ```c++
 timingtransmitter.cpp 定时发送控制信号
@@ -2857,7 +2854,7 @@ void TimingTransmitter::AUTOcontrol(){
             emit start_auto();
 ```
 
-#### sensorFunction.cpp
+#### sensorFunction.cpp传感器数据和关节数据进行处理
 
 ```C++ 
 sensorFunction.cpp //对传感器数据和关节数据进行处理
@@ -2866,7 +2863,7 @@ sensorFunction.cpp //对传感器数据和关节数据进行处理
     //fixFun()：修正操作，根据传感器数据计算 tmpJoint 并更新 offset 的值  == 根据基准值调整传感器数据
 ```
 
-#### trajectory_plan.cpp
+#### trajectory_plan.cpp轨迹点和姿态
 
 ```c++
 trajectory_plan.cpp、trajectoryDisplayWindow.cpp、trajectoryinterpolator.cpp
@@ -2895,7 +2892,7 @@ QVector<ApproachVector> getPosture();：获取生成的轨迹姿态。
     
 ```
 
-#### trajectoryDisplayWindow.cpp
+#### trajectoryDisplayWindow.cpp  OpenGL 在 GUI 显示
 
 ```c++
 trajectoryDisplayWindow.cpp
@@ -3170,7 +3167,6 @@ void OpenGLWindow::updatePracticeTraj()
 
 ```c++
 using namespace std;  // 使用标准C++命名空间
-
 class OpenGLWindow : public QGLWidget
 {
     Q_OBJECT  // 使用Qt元对象宏，启用Qt的信号和槽机制
