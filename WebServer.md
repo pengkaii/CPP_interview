@@ -1926,14 +1926,13 @@ Reactor模型是⼀个针对同步I/O的⽹络模型，主要是使⽤⼀个reac
 
 ##### 日志系统怎么做的
 
-- 使用单例模式创建日志系统，对服务器运行状态、错误信息和访问数据进行记录，该系统可以实现按天分类，超行分类功能，可以根据实际情况分别使用同步和异步写入两种方式
+- 使用单例模式创建日志系统，对服务器运行状态、错误信息和访问数据进行记录，该系统可以实现按天分类，超行分类功能，可以根据实际情况分别使用同步和异步写入两种方式。
 
 - 其中异步写入方式，使用双缓冲机制体现。
 
 - 在多线程程序中写 Log 无非就是前端往后端写，后端往硬盘写，⾸先将LogStream 的内容写到了 AsyncLogging 缓冲区⾥，也就是前端往后端写，这个过程通过 append 函数实现，后端实现通过 threadfunc 函数，两个线程的同步和等待通过**互斥锁和条件变量**来实现，具体实现使⽤了双缓冲技术。
 
-
-###### **双缓冲思路**、好处
+**双缓冲思路**、好处
 
 - 准备两块 buffer 1 和 2; 
 
@@ -1958,7 +1957,7 @@ Reactor模型是⼀个针对同步I/O的⽹络模型，主要是使⽤⼀个reac
 
 
 
-######  日志系统代码实现
+日志系统代码实现
 
 - 1、 logStream类的实现， logStream 类的主要作⽤是将各个类型的数据转换为 char 的形式放入字符数组中（也就是前端⽇志写⼊ Buffer A 的这个过程），⽅便后端线程写⼊硬盘。
 - 2、logStream 类只持有⼀个缓冲区 Buffer ，然后重载对流式运算符 << 进⾏了重载，由于⽇志输⼊的类型繁多，为了后端写⼊⽅便（也为了缓冲区的格式统⼀），需要将输⼊的数据转换为 char 字符类型再进⾏写⼊。
@@ -1980,7 +1979,7 @@ Reactor模型是⼀个针对同步I/O的⽹络模型，主要是使⽤⼀个reac
 
 
 
-######  **什么时候切换写到另⼀个⽇志⽂件**
+**什么时候切换写到另⼀个⽇志⽂件**
 
 - 前⼀个 Buffer 已经写满了，则交换两个 Buffer（写满的 Buffer 置空）。
 - ⽇志串写⼊过多，⽇志线程来不及消费，怎么办？直接丢掉多余的⽇志 Buffer，腾出内存，防⽌引起程序故障。
@@ -1995,7 +1994,7 @@ Reactor模型是⼀个针对同步I/O的⽹络模型，主要是使⽤⼀个reac
 
 - **异步方式采用双缓冲机制**，具有较高的并发能力。**异步日志，将所写的日志内容先存入阻塞队列，写线程从阻塞队列中取出内容，写入日志。可以提高系统的并发性能。**
   
-  - **用双缓冲：**双缓冲区的好处是：在大部分的时间中，前台线程和后台线程不会操作同一个缓冲区，这也就意味着前台线程的操作，不需要等待后台线程缓慢的写文件操作(因为不需要锁定临界区)。通过双缓冲技术，很好地解决了生产者和消费者之间的异步操作和速度不匹配问题，提高了日志系统的整体吞吐率。
+- **用双缓冲：**在大部分的时间中，前台线程和后台线程不会操作同一个缓冲区，这也就意味着前台线程的操作，不需要等待后台线程缓慢的写文件操作(因为不需要锁定临界区)。通过双缓冲技术，很好地解决了生产者和消费者之间的异步操作和速度不匹配问题，提高了日志系统的整体吞吐率。
   
   - **不用生产者-消费者模型**，并发编程中的经典模型。以多线程为例，为了实现线程间数据同步，生产者线程与消费者线程共享一个缓冲区，其中生产者线程往缓冲区中push消息，消费者线程从缓冲区中pop消息。
   
@@ -2010,24 +2009,6 @@ Reactor模型是⼀个针对同步I/O的⽹络模型，主要是使⽤⼀个reac
 
 
 
-
-###### 服务器崩溃，⽇志系统发⽣什么、解决
-
-**发生情况：**
-
-1. **日志丢失**： 如果日志系统配置为缓存日志信息并且定期写入磁盘，那么崩溃时还未写入磁盘的日志信息可能会丢失。
-2. **日志不完整**： 服务器在写入日志时崩溃，可能会导致最后一部分日志信息不完整。
-3. **文件损坏**： 如果崩溃发生在日志文件写入操作的过程中，可能会导致日志文件损坏。
-4. **性能下降**： 如果服务器崩溃后自动重启，并且大量的日志写入操作在启动时进行，可能会暂时影响服务器的性能。
-
-**解决：**
-
-1. **日志分割**： 定期分割日志文件，减少单个日志文件的大小，这样即使某个日志文件损坏，也只影响一小部分数据。
-2. **数据恢复策略**： 定期备份日志文件，以便在文件损坏时可以从备份中恢复。
-3. **事务日志**： 对于数据库等系统，使用事务日志可以在发生崩溃时恢复到最后一次一致的状态。
-4. **使用写前日志（Write-Ahead Logging, WAL）**： 在更新数据之前先写入日志，确保即使发生故障，也能够恢复到故障发生前的状态。
-5. **系统自动重启后的日志处理**： 确保系统崩溃重启后，有清晰的日志处理流程，比如先处理残留的旧日志数据，再开始正常的日志记录。
-6. **错误处理机制**： 为日志系统实现错误处理机制，比如在捕获到写入错误时，可以重试或将日志写入备用存储。
 
 5.5 服务器运⾏中，实际存储的⽂件被其他⽤户修改了，会发⽣什么？有什么优化的想法？
 
@@ -2088,6 +2069,800 @@ Reactor模型是⼀个针对同步I/O的⽹络模型，主要是使⽤⼀个reac
 - 日志写入前会判断当前day是否为创建日志的时间，行数是否超过最大行限制
 - - 若为创建日志时间，写入日志，否则按当前时间创建新log，更新创建时间和行数
   - 若**行数超过最大行限制**，在当前日志的末尾加count/max_lines为后缀创建新log
+
+
+
+
+
+
+
+
+
+##### 异步日志原理
+
+- 日志库分采用前后端分离。多个前端线程写日志到大缓冲区（要加锁），**一个后端线程**把前端线程的总日志写入文件，不用加锁，但是唤醒后端线程后交换两个缓冲区队列过程要加锁。
+- **日志库采用双缓冲技术**，准备两个缓冲区，前后端各有一个4MB的Buffer，buffer缓冲区A 和 buffer缓冲区B（**一端实际各有两个，有个备用缓冲区，还有个缓冲区队列**），前端负责向 A 中写入日志消息，后端负责将 B 中的数据写入文件。
+- 前端**当前Buffer**写满了之后，唤醒**后端线程**，后端线程加锁，让后端缓冲区队列与前端写满缓冲区队列**互换**（只交换其指针的指向），互换完成后**释放锁**，让**前端线程**继续向互换后的Buffer缓冲区中写入日志，而不必等待后端线程把日志全部写入文件后再释放锁，同时也避免每条新日志消息到来都唤醒**后端日志线程**。大大**减小了锁的粒度**，这也是muduo异步日志高效的关键原因之一。
+
+###### 后端线程唤醒条件
+
+**后端线程**的唤醒有两个条件：
+
+- **buffer 写满**唤醒：前端**当前缓冲区Buffer**写满了，**唤醒后台线程**互换Buffer，并把Buffer中的日志写入文件，减少线程被唤醒的频率，降低系统开销。
+- **超时被唤醒**：**为了及时把前端Buffer中的日志写入文件，日志库也会每3秒执行一次交换Buffer的操作**。防止系统故障导致内存中的日志消息丢失，超过规定的时间阈值，即使 **前端当前缓冲区**buffer 未满，也会立即将 buffer 中的数据写入。
+
+
+
+
+
+缓冲区 A 和 B，分别对应前台日志缓冲队列 buffers 和后台日志缓冲队列 buffersToWrite。
+
+- muduo前后端**各有两个大小为4MB的Buffer**，是FixedBuffer.h中定义的4MB大小的**字符数组**。
+
+
+
+##### 双缓冲过程
+
+- 在0~3秒之间，**前端线程**调用宏`LOG_INFO << 日志信息;`，会开辟一个4KB内存空间，放一条log日志信息，然后存储到前端Buffers_**4M写满缓冲区队列**（黄色Buffer)中，同时析构自己刚开辟的4KB的空间。考虑到多个前端线程会往4M大缓冲区队列放一条日志，当前前端线程需要加锁处理，保证线程安全<br />
+- 在**3秒超时**或者**前端的当前小缓冲区写满**之后，后端线程被唤醒，为了让**前端线程**阻塞时间更短，后端线程也需要加锁，把后端待写缓冲区队列Buffer和前端写满缓冲区队列Buffer互换，互换后后端线程释放锁，这样前端线程又可以向红色Buffer中写入新的日志信息。后端线程也可以把来自前端的黄色Buffer中的数据写入文件。
+- <a name="ferif"></a>
+
+![](../%E6%A1%8C%E9%9D%A2/%E8%87%AA%E5%B7%B1%E6%95%B4%E7%90%86/%E5%9B%BE%E7%89%87/%E6%97%A5%E5%BF%97.png)<br />
+
+
+
+
+
+##### 异步日志流程
+
+异步日志前端产生日志和同步是一致的，异步LogStream::buffer_小缓冲区的数据是怎么输出到指定位置。异步日志不是默认的方式，需要自行开启，下从开启异步日志开始讲。
+<a name="X6Yob"></a>
+
+开启异步日志
+
+`AsycnLogging`只提供了向**文件写入的功能**，由于`Logger`默认输出位置是`stdout`，所以需要像同步日志那样调用`Logger::setOutput(OutputFunc out)`接口，把**日志输出位置改为文件**。核心代码如下：
+
+```cpp
+AsyncLogging* g_asyncLog = nullptr;//异步日志对象
+void asyncOutput(const char* msg, int len)
+{
+	g_asyncLog->append(msg, len);
+}
+
+int main()
+{
+    off_t kRollSize = 500*1000*1000;
+    AsyncLogging log(“basename”, kRollSize);
+    log.start();		// 启动异步日志的后台线程
+    g_asyncLog = &log;
+    Logger::setOutput(asyncOutput);//更改日志输出位置
+    LOG_INFO << "Hello 0123456789" << " abcdefghijklmnopqrstuvwxyz";
+    return 0;
+}
+```
+
+<a name="YL97Z"></a>
+
+###### 前端线程日志写入
+
+- `AsyncLogging::append()`函数原理：前端生成一条日志消息。先将**日志信息存储到用户自己开辟的4M小缓冲区**，当**当前小缓冲区写满或3s超时**后，唤醒后台线程，加锁，将两个**缓冲区队列**互换后，再将**写满的缓冲区的数据**写入文件。
+- 前端准备一个**前台缓冲区队列 `buffers_`和两个 buffer**。前台缓冲队列 `buffers_`用来存放多个小缓冲区的日志消息。两个 buffer，一个是当前缓冲区 `currentBuffer`，追加的日志消息存放于此；另一个作为备份缓冲区，即 `nextBuffer`，减少内存的开销。
+
+**函数执行逻辑如下：**
+
+判断当前缓冲区 `currentBuffer_`是否已经写满。
+
+- 若4MB当前缓冲区未满，追加日志消息到当前缓冲，这是最常见的情况
+- 若**当前缓冲区写满**，首先，把它移入前台缓冲队列 `buffers_`。其次，尝试把预备缓冲区 `nextBuffer_`移用为当前缓冲，若失败则**创建新的缓冲区作为当前缓冲**。最后，追加日志消息并唤醒后端日志线程开始写入日志数据。
+
+
+
+- `currentBuffer_`有4MB大小，是为了**多积累一些日志信息**，然后**一并交给后端**写入文件，**避免频繁通知后台写文件**。`currentBuffer_->append()`是只把**一条日志信息写入`currentBuffer_`**中，而不是像`LogFile`的`apend()`是将**数据写入文件**中。
+
+###### 前端线程代码
+
+```cpp
+// 前端开启异步日志，调用append，把日志信息写入currentBuffer_当前4M缓冲区中
+void AsyncLogging::append(const char* logline, int len)
+{
+    // apend会被多个线程中调用，多个线程会同时向currentBuffer_中写数据，因此要加锁
+    std::lock_guard<std::mutex> lock(mutex_);
+    // 当前缓冲区剩余空间足够则直接写入
+    if (currentBuffer_->avail() > len)
+    {
+        currentBuffer_->append(logline, len);
+    }
+    else
+    {
+        // 当前缓冲区空间不够写，将新信息写入备用缓冲区
+        // 将写满的当前缓冲区currentBuffer_装入写满缓冲区队列vector中，即buffers_中
+        // 注意currentBuffer_是独占指针，move后自己就指向了nullptr空内存
+        buffers_.push_back(std::move(currentBuffer_));
+        // nextBuffer_备用缓冲区不空，说明nextBuffer_指向的内存还没有被currentBuffer_抢走，也就是
+        // nextBuffer_还没开始使用
+        if (nextBuffer_) 
+        {
+            // 把nextBuffer_指向的内存区域交给currentBuffer_，nextBuffer_也被置空
+            currentBuffer_ = std::move(nextBuffer_);
+        } 
+        else 
+        {
+            // 备用缓冲区也不够时，重新分配缓冲区，这种情况很少见
+            currentBuffer_.reset(new Buffer);
+        }
+        //将新日志信息加到当前缓冲区
+        currentBuffer_->append(logline, len);
+        // 唤醒一个后端线程去将日志写入磁盘
+        cond_.notify_one();
+    }
+}
+```
+
+<a name="mMD1b"></a>
+
+###### 后端线程日志落盘
+
+- `AsyncLogging::threadFunc()`：后端日志落盘线程的执行函数。
+- 后端同样也准备了一个后台缓冲区队列 `buffersToWrite` 和两个备用 buffer。后台缓冲区队列 `buffersToWrite` 存放待写入磁盘的数据。两个备用 buffer，`newBuffer1`和`newBuffer2`，分别用来替换前台的当前缓冲和预备缓冲，而这两个备用 buffer 最后会被`buffersToWrite`内的两个 buffer 重新填充，减少了内存的开销。
+
+函数执行逻辑如下，注意思考如何锁的粒度如何减小，起到了什么作用。
+
+- 唤醒日志落盘线程（超时或写满buffer），交换前台缓冲队列和后台缓冲队列。加锁
+- 日志落盘，将后台缓冲队列的所有 buffer 写入文件。不加锁，这样做的好处是日志落盘不影响前台缓冲队列的插入，不会出现阻塞问题，极大提升了系统性能。
+
+`buffersToWrite`**后端缓冲区队列**用于接管前端的所有日志信息，提前释放锁，以便**前端可以继续写日志**，`buffersToWrite`接管后，在慢慢的往文件中写，写入文件的核心代码是`output.append(buffer->data(), buffer->length());`
+<a name="xOoWC"></a>
+
+
+
+###### 后端线程代码
+
+```cpp
+void AsyncLogging::threadFunc()
+{
+    // output输出位置有写入磁盘的接口，异步日志后端的日志信息只会来自buffersToWrite待写缓冲区队列。
+    // 不会来自其他线程，不必考虑线程安全，所以output的threadSafe设置为false。
+      // logFile 类负责将数据写入磁盘
+    LogFile output(basename_, rollSize_, false);    
+    // 后端小缓冲区1、2，用于归还 前端的缓冲区（当前、备用），currentBuffer nextBuffer
+    BufferPtr newBuffer1(new Buffer);
+    BufferPtr newBuffer2(new Buffer);
+    newBuffer1->bzero();
+    newBuffer2->bzero();
+    // 后端缓冲区队列数组置为16个，用于和前端缓冲区数组进行交换
+    BufferVector buffersToWrite;
+    buffersToWrite.reserve(16);
+     // 异步日志开启，则循环执行
+    while (running_)
+    {
+        {
+ // <---------- 交换前台缓冲队列和后台缓冲队列 ---------->
+            // 后端线程 交换缓冲区队列加锁，交换后释放锁
+            // 互斥锁保护，前端线程在这段时间内无法向前端Buffer缓冲区队列数组写入数据
+            // 1、多线程加锁，线程安全，注意锁的作用域
+            std::unique_lock<std::mutex> lock(mutex_);
+            // 2、判断前台缓冲队列 buffers 是否有数据可读
+            if (buffers_.empty())
+            // 前端缓冲区队列为空，超过3s，也会唤醒后端线程
+            {
+                 // 触发日志的落盘 (唤醒) 的两个条件：1.超时，等待三秒也会解除阻塞 or 2.被唤醒，即前台写满 buffer
+                cond_.wait_for(lock, std::chrono::seconds(3));
+            }
+            // 只要触发日志落盘，不管当前的 buffer 是否写满都必须取出来，写入磁盘。此时正使用的前端当前缓冲区buffer也放入buffer数组中（没写完也放进去，避免等待太久才刷新一次）
+            // currentbuffer 被锁住 -> currentBuffer 被置空  
+ buffers_.push_back(std::move(currentBuffer_));
+             // 4、将空闲的 newbuffer1 移为当前缓冲，复用已经分配的空间
+            currentBuffer_ = std::move(newBuffer1);// currentbuffer 需要内存空间
+            //  5、核心：后端缓冲区队列和前端缓冲区队列交换
+            buffersToWrite.swap(buffers_);
+            // 若预备缓冲为空，则将空闲的 newbuffer2 移为预备缓冲，复用已经分配的空间
+            if (!nextBuffer_)
+            {
+                nextBuffer_ = std::move(newBuffer2);
+            }
+        }// 注意这里加锁的粒度，日志落盘的时候不需要加锁了，主要是双队列的功劳
+        ...省略归还缓冲区的代码...
+            
+         // <-------- 日志落盘，将buffersToWrite中的所有buffer写入文件 -------->
+     assert(!buffersToWrite.empty());
+     // 6、异步日志消息堆积的处理。缓冲区队列25个缓冲区
+     // 同步日志，阻塞io，不存在堆积问题；异步日志，直接删除多余的日志，并插入提示信息
+     if (buffersToWrite.size() > 25) {
+       printf("Dropped\n");
+       // 插入提示信息
+       char buf[256];
+       snprintf(buf, sizeof buf, "Dropped log messages at %s, %zd larger buffers\n",
+ Timestamp::now().toFormattedString().c_str(),
+                buffersToWrite.size()-2);    
+       fputs(buf, stderr);
+       output.append(buf, static_cast<int>(strlen(buf)));
+       // 只保留2个buffer(默认4M)
+       buffersToWrite.erase(buffersToWrite.begin()+2, buffersToWrite.end());   
+     }
+
+        // 遍历后端缓冲区队列的所有 buffer，将其写入文件
+        for (const auto& buffer : buffersToWrite)
+        {
+            // 内部封装 fwrite，将 buffer中的一行日志数据，写入用户缓冲区，等待写入文件
+            output.append(buffer->data(), buffer->length());
+        }
+    // 8、刷新数据到磁盘文件？这里应该保证数据落到磁盘，但事实上并没有，需要改进 fsync
+     // 内部调用flush，只能将数据刷新到内核缓冲区，不能保证数据落到磁盘（断电问题）
+        output.flush(); //刷新缓冲区的文件到磁盘
+    }
+    
+    
+    // 9、重新填充 newBuffer1 和 newBuffer2
+     // 改变后台缓冲队列的大小，始终只保存两个 buffer，多余的 buffer 被释放
+     // 为什么不直接保存到当前和预备缓冲？这是因为加锁的粒度，二者需要加锁操作
+     if (buffersToWrite.size() > 2) {
+        // 只保留2个buffer，分别用于填充备用缓冲 newBuffer1 和 newBuffer2
+       buffersToWrite.resize(2);  
+     }
+     // 用 buffersToWrite 内的 buffer 重新填充 newBuffer1
+     if (!newBuffer1) {
+       assert(!buffersToWrite.empty());
+       newBuffer1 = std::move(buffersToWrite.back()); // 复用 buffer
+       buffersToWrite.pop_back();
+       newBuffer1->reset();    // 重置指针，置空
+     }
+     // 用 buffersToWrite 内的 buffer 重新填充 newBuffer2
+     if (!newBuffer2) {
+       assert(!buffersToWrite.empty());
+       newBuffer2 = std::move(buffersToWrite.back()); // 复用 buffer
+       buffersToWrite.pop_back();
+       newBuffer2->reset();   // 重置指针，置空
+     }
+     // 清空 buffersToWrite
+     buffersToWrite.clear();  
+   }
+    output.flush();
+}
+```
+
+
+
+
+
+
+
+##### **coredump 查找未落盘的日志**
+
+异步日志实现的日志消息并不是生成后立刻就会写入文件，而是先存放在**前台当前缓冲区 `currentbuffer` 或者前台缓冲区队列 `buffers`**中。每过一段时间后才会将缓冲区中的日志消息写到日志文件中。这样就会产生问题：如果程序在中途 core dump 了，那么**在缓冲区中还未来得及写出的日志消息**该如何找回？
+
+构造场景：**主线程开启日志线程**，写入100w条日志，当写到第50w条时人为往空指针写数据制造异常退出，引发 core dump。
+
+```c
+ void testCoredump() {
+     AsyncLogging log("coredump", 200*1000*1000);
+     log.start();   //开启日志线程
+     g_asyncLog = &log;
+     int msgcnt = 0;
+     Logger::setOutput(asyncOutput); //设置日志输出函数
+  
+     // 写入100万条日志消息
+     for(int i = 0; i < 1000000; ++i)   {
+       LOG_INFO << "testCoredump" << ++msgcnt;
+       if(i == 500000) {
+         int *ptr = NULL;
+         *ptr = 0x1234;  // 人为制造异常
+       }
+     } 
+ }
+```
+
+###### gdb 升级
+
+```bash
+ # 编译 gdb 过程中需要 texinfo，安装 texinfo
+ sudo apt-get install texinfo
+ 
+ # 下载gdb11
+ wget http://ftp.gnu.org/gnu/gdb/gdb-11.1.tar.gz
+ tar -zxvf gdb-11.1.tar.gz
+ # 编译
+ cd gdb-11.1 
+ ./configure 
+ make 
+ sudo make install
+ 
+ # 将 gdb 放到 bin 目录
+ mv /usr/bin/gdb /usr/bin/gdb_bak
+ cp /opt/gdb-11.1/gdb /usr/bin/gdb
+```
+
+###### 生成 core
+
+用 coredump 生成的 **core 文件**来找还未写出的日志消息。运行程序命令，生成了 **core 文件和一个 .log 日志文件**。
+
+```bash
+ # 查看 core 文件是否开启，默认不生成，0
+ ulimit -c
+ # 开启 core 文件生成，unlimited指的是core文件的最大大小，可以设置为其它数字
+ ulimit -c unlimited
+```
+
+使用 `tail -f`（显示文件的最后几行（默认是10行）命令查看到日志文件中有 460132 条日志消息，其余日志消息未来得及写出。下面**通过 core 文件查找剩下的日志消息**。
+
+###### gdb 调试 core 文件
+
+使用 gdb 执行 coredump 文件。`gdb [execfile可执行文件] [corefile 文件]`
+
+```bash
+ gdb main_log_test core
+```
+
+![img](https://pic4.zhimg.com/80/v2-762df119d38e0972a0c70d7812d5e6cf_720w.webp)
+
+通过 gdb 信息可以看到，`Program terminated with signal SIGSEGV, Segmentation fault`。`LWP` 是线程的标识，这里当前线程的 LWP 为4614，共有两个线程：LWP 4614 和 4615。崩溃是在主线程。
+
+
+
+
+
+用 **thread info**查看线程信息，用 `thread id` **切换线程栈**。
+
+使用 `thread 2`切换查看**后端日志线程**，可以看到线程2位于 pthread_cond_timewait
+
+![img](https://pic3.zhimg.com/80/v2-7dec857ec1cdf904ce48af16fb010832_720w.webp)
+
+使用 `bt (backtrace)` 查看**线程的堆栈信息**。`frame id` 切换栈空间。
+
+![img](https://pic4.zhimg.com/80/v2-699f1ba916a9228864c445d0f84cc4b3_720w.webp)
+
+- 此时相当于是 **append 函数的栈帧**未写出的日志消息，只可能存在于 `currentBuffer_`或`buffers_`中。
+- 可以通过`currentBuffer.get()`获取该 unique_ptr 所指向的**LogStream 。可以用 print 打印**。由于打印信息数量受到 FixedBuffer 的 max-value-size 限制，所以需要先设置 max-value-size 为无限大
+
+```bash
+ set max-value-size unlimited
+ print *currentBuffer_.get()
+```
+
+![img](https://pic2.zhimg.com/80/v2-f3385647320d50f82fd9097c682da9dd_720w.webp)
+
+print *currentBuffer_.get()
+
+可以看到显示了一部分日志信息，还是有很多被省略了，因为 gdb 的终端输出长度有限制，默认为200个字符，**可以修改这个限制。这样可以在屏幕上全部显示。**
+
+```bash
+ show print elements # 可以看到限制200个字符
+ set print elements unlimited
+ show print elements # 修改成 unlimited
+```
+
+将终端上的所有打印的信息输出到指定文件
+
+```bash
+ set logging file gdbinfo.txt # 指定日志输出文件
+ set logging on   # 开启日志拷贝
+ set logging off  # 关闭日志拷贝
+```
+
+接下来，`print *currentBuffer_.get()`，**一直按回车**，打印 buffer 所有的数据，**所有终端上的打印信息都会拷贝到 gdbInfo.txt 中。**
+
+
+
+vim 打开 gdbInfo.txt，所有数据都被当作了一行，这是因为在拷贝时，将 '\n' 作为了两个普通的字符而不是换行符。在 vim 中将其查找替换即可，在命令模式下输入：`%s/\\n/\r/g`，回车
+
+![img](https://pic4.zhimg.com/80/v2-29840817a77b2e83a9a1ca65454e5907_720w.webp)
+
+可以查找到后台日志线程写入的第50w条日志。
+
+###### **高性能日志原因**
+
+**如何实现高性能的日志**
+
+- **批量写入：**存够数据，一次写入
+- **唤醒机制**：**写满通知唤醒** `notify` + **超时唤醒** `wait_timeout`
+- **锁的粒度**：**刷新磁盘时，日志接口不会阻塞**。这是通过双队列实现的，前台队列实现日志接口，后台队列实现刷新磁盘。
+- **内存分配**：移动语义，避免深拷贝；双缓冲，前台后台都设有。
+
+
+
+
+
+
+
+##### **单例模式实现日志系统**
+
+-  单例模式：构造和析构函数私有化
+-  静态成员函数：返回类指针
+-  静态成员函数：类外释放对象
+-  静态成员：指向本类的指针
+-  类外初始化静态成员
+   Mylogger *Mylogger::_pInstance = getInstance(); // 饿汉模式
+
+
+
+-  1、设置日志的格式: Layout
+       %c %d日期 %p优先级 %m消息 %n换行
+-  2、日志的目的地: Appender 参数: 名称(没用) + 流名字
+-  3、日志的种类
+
+```c++
+/* MyLogger.h */
+ #ifndef __MYLOGGER_H__
+ #define __MYLOGGER_H__
+ #include <log4cpp/Category.hh>
+ using namespace log4cpp;
+ ​
+ // 单例模式：构造和析构函数私有化
+ class Mylogger {
+ public:
+     // 静态成员函数：返回类指针
+     static Mylogger *getInstance();
+     // 静态成员函数：类外释放对象
+     static void destroy();
+     void warn(const char * msg);
+     void error(const char * msg);
+     void debug(const char * msg);
+     void info(const char * msg);
+ ​
+ private:
+      Mylogger();
+     ~Mylogger();
+ private:
+     // 静态成员：指向本类的指针
+     static Mylogger *_pInstance;
+     // Category对象的引用
+     Category &_myCat; 
+ };
+ #endif
+ /* MyLogger.cc */
+ #include "MyLogger.h"
+ #include <ilog4cpp/PatternLayout.hh>
+ #include <log4cpp/FileAppender.hh>
+ #include <log4cpp/OstreamAppender.hh>
+ #include <log4cpp/Priority.hh>
+ #include <iostream>
+ using std::cout;
+ using std::endl;
+ using namespace log4cpp;
+ ​
+ // 类外初始化静态成员
+ Mylogger *Mylogger::_pInstance = getInstance(); // 饿汉模式
+ ​
+ Mylogger::Mylogger()
+ : _myCat(Category::getRoot().getInstance("mycat"))
+ {
+     cout << "Mylogger()" << endl;
+     // 1、设置日志的格式: Layout
+     // %c %d日期 %p优先级 %m消息 %n换行
+     PatternLayout *ppl1 = new PatternLayout();
+     ppl1->setConversionPattern("%d %c [%p] %m%n");
+     PatternLayout *ppl2 = new PatternLayout();
+     ppl2->setConversionPattern("%d %c [%p] %m%n");
+ ​
+     // 2、日志的目的地: Appender 参数: 名称(没用) + 流名字
+     OstreamAppender *pos = new OstreamAppender("OstreamAppender", &cout);
+     pos->setLayout(ppl1);
+     RollingFileAppender *pfa = new RollingFileAppender("RollingFileAppender", name, 3 * 1024, 3);
+     pfa->setLayout(ppl2);
+     
+     // 3、日志的种类
+     _myCat.addAppender(pos);
+     _myCat.addAppender(pfl);
+     _myCat.setPriority(Priority::DEBUG);
+ }
+ Mylogger::~Mylogger() {
+     cout << "~Mylogger()" << endl;
+     // 回收资源
+     Category::shutdown();
+ }
+ ​
+ Mylogger *Mylogger::getInstance() {
+     if(nullptr == _pInstance) {
+         _pInstance = new Mylogger();
+     }
+     return _pInstance;
+ }
+ ​
+ void Mylogger::destroy() {
+     if(_pInstance) {
+         delete _pInstance;
+         _pInstance = nullptr;
+     }
+ }
+ ​
+ void Mylogger::warn(const char * msg) {
+     _myCat.warn(msg);
+ }
+ ​
+ void Mylogger::error(const char * msg) {
+     _myCat.error(msg);
+ }
+ ​
+ void Mylogger::debug(const char * msg) {
+     _myCat.debug(msg);
+ }
+ ​
+ void Mylogger::info(const char * msg) {
+     _myCat.info(msg);
+ }
+ /* MyLoggertest.cc */
+ #include "MyLogger.h"
+ #include <iostream>
+ #include <string>
+ using std::cout;
+ using std::endl;
+ using std::string;
+ ​
+ #define prefix(msg) (string(__FILE__) + string("  ") \
+         + string(__FUNCTION__) + string("  ") \
+         + string (std::to_string(__LINE__)) \
+         + string("  ") + msg ).c_str()
+ ​
+ #define LogError(msg) Mylogger::getInstance()->error(prefix(msg))
+ #define LogInfo(msg) Mylogger::getInstance()->info(prefix(msg))
+ #define LogWarn(msg) Mylogger::getInstance()->warn(prefix(msg))
+ #define LogDebug(msg) Mylogger::getInstance()->debug(prefix(msg))
+ ​
+ string func(const string &msg) {
+     string s1 = string(__FILE__) + string("  ") 
+         + string(__FUNCTION__) + string("  ")
+         + string (std::to_string(__LINE__)) 
+         + string("  ") + msg;
+ ​
+     return s1;
+ }
+ ​
+ void test() {
+     Mylogger *pml = Mylogger::getInstance();
+ ​
+     logInfo("The log is info message");  
+     logError("The log is error message");
+     logWarn("The log is warn message");
+     logDebug("The log is debug message");
+ }
+ ​
+ int main(int argc, char **argv)
+ {
+     test();
+     return 0;
+ }
+```
+
+
+
+
+
+##### 异步日志、同步日志区别
+
+**异步日志：**把日志**先保存到缓存中**，当日志达到一定数量后，或者缓冲区存满后再统一写入终端或者文件。
+
+- 优点：这种积累日志的方式**大大减少了日志IO操作的次数**，几乎不耽误网络IO。
+- 缺点：不能把日志实时写入文件，当**意外断电**，很可能缓存中大量日志还没来得及写入文件，导致大量日志丢失。
+  <a name="SxuW1"></a>
+
+日志的作用：便于我们观察服务器当前状态，也有利于排查服务器上的错误，便于维护服务器<br />日志分为同步和异步日志：<br />**同步日志：**有日志信息产生的话立刻输出到终端或者文件
+
+- 优点：可以马上观察到服务器的状态
+- 缺点：如果日志过多，就会频繁写数据，写是一种IO操作，比较耗时，日志过多后，线程大部分时间都浪费在写日志上了，而耽误了网络IO的处理，也就限制了高并发。
+
+
+
+
+
+
+
+##### 各个类的作用
+
+| 类名         | 功能                                                         |
+| ------------ | ------------------------------------------------------------ |
+| FixedBuffer  | 封装了一个**固定长度的字符数组**当作buffer，具有向buffer存取数据的功能。（该类定义在LogStream.h中） |
+| LogStream    | 此类为**多种数据类型重载了`<<`运算符**，重载的`<<`函数内部都是将要`<<`的数据存储到它**自己的成员变量`buffer_`中**，这个`buffer_`是`FixedBuffer`类型，大小是**4KB**。 |
+| FileUtil     | 封装的**文件工具类**，是个封装过的文件指针。具有将`char*`指向的数据写入文件的功能，其类也有个**64KB的缓冲区**供写文件时候使用。 |
+| LogFile      | 具有**利用`FileUtil`把日志写入文件**的功能，也可以根据时间和日志文件大小创建新日志文件的功能。 |
+| AsyncLogging | 前端有两个**4M的大缓冲区**（`FixedBuffer`类型）用于存储日志信息，后端有个子线程，也有两个4M的缓冲区，用于和前端写了日志的缓冲区进行交换，交换后，**后端就借助`LogFile`可以把日志**信息往文件中写入。 |
+| Logging      | 能够设置日志级别，能够设定`LogStream`获得的日志信息输出到什么位置（输出到stdout还是文件） |
+
+<a name="duajv"></a>
+
+
+
+
+
+
+
+
+
+
+
+##### 同步日志流程
+
+<a name="mLSse"></a>
+
+产生日志
+
+下面以前端线程调用`LOG_INFO << "abcd" << 15;`为例，看看到底内部发生了什么。
+
+```cpp
+#define LOG_INFO if (logLevel() <= Logger::INFO) \
+	Logger(__FILE__, __LINE__).stream()
+```
+
+首先从上面`LOG_INFO`的宏定义可见，`LOG_INFO`实际上是创建了一个**`Logger`临时对象**，并调用其成员函数`Stream()`，`Stream()`返回的是一个`LogStream`对象的引用，`LogStream`和`cout`很像， 该类重载了`<<`的多种形式，以便`LOG_INFO`能够`<<`多种类型数据。**`LogStream`有一个4KB的`buffer_`**，其所有重`<<`载的函数都只做一件事：把日志信息（此例中为`“abcd”`和`15`），添加（`apend`）到`LogStream`的`buffer_`中。由此也可见`LogStream`**类的**`buffer_**尽管有4KB大小，但是只存储一条日志信息。**
+<a name="K4f8a"></a>
+
+日志输出到指定位置
+
+<a name="V8rgM"></a>
+
+日志输出到`stdout标准流`
+
+把在**`LogStream`类的`buffer_`**中存储的的**一条日志**写输出到指定位置（以`stdout`为例）<br />从上面`LOG_INFO`的宏定义可见，`LOG_INFO << "abcd" << 15;`执行结束后就会析构`Logger`对象，**`buffer_`中的数据也正是`Logger`析构的时候被输出到`stdout`**，`Logger`析构函数会调用`defaultOutput`函数（定义在`Logging.cc`中），改函数代码如下：
+
+```cpp
+static void defaultOutput(const char* data, int len)
+{
+    fwrite(data, len, sizeof(char), stdout);
+}
+```
+
+其中，`data`就是`LogStream`的**`buffer_`中存储的数据**。
+<a name="Tnt7A"></a>
+
+日志输出到文件
+
+如果同步日志想把**日志信息fwrite到文件**中，需要手动完成以下步骤：<br />
+
+- FileUtil`中的`buffer_(64KB大小，是FileUtil文件指针fp_对应的缓冲区)，
+- LogStream中的buffer_（4KB大小，只存储一条日志），我们在buffer_上加上类名。
+
+1. 创建一个`LogFile`对象。`LogFile`类有个成员函数`apend(char *data, int len)`，只要给他日志信息，即给他`LogStream::buffer_`中的`char *`数据，他就能把日志信息写入文件。所以需要先创建有个**`LogFile`对象**，才能写文件。
+2. 让**`Logger`类的输出位置指向文件**。由于`Logger`默认输出位置是`stdout`，所以需要**改变`Logger`的输出位置**。由于`Logger`类提供了`Logger::setOutput(OutputFunc out)`接口，因此可以通过如下方式将日志输出位置改为文件：
+
+```cpp
+#include "Logging.h"
+#include "LogFile.h"
+
+std::unique_ptr<LogFile> g_logFile;//日志文件对象
+// msg就是LogStream::buffer_小缓冲区中存储的一条日志信息，把这条日志信息apend到FileUtil的buffer_大缓冲区中
+void dummyOutput(const char* msg, int len)
+{	
+	if (g_logFile) {
+    	g_logFile->append(msg, len);
+    }
+}
+int main() {
+	g_logFile.reset(new LogFile("test_log_st", 500*1000*1000, false));
+    Logger::setOutput(dummyOutput);	// 改变Logger的输出位置
+    LOG_INFO << "Hello 0123456789" << " abcdefghijklmnopqrstuvwxyz";
+    return 0;
+}
+```
+
+此后，`LOG_INFO << data`创建的临时`Logger`对象在析构时，`Logger`类的`g_output`（函数指针）就不再指向`defaultOutput`函数而是指向`dummyOutput`函数了，即，就不会调用`defaultOutput`输出到`stdout`上了，而是调用上述代码的`dummyOutput`函数，把日志`LogStream::buffer_`中**存储的一条日志通过`Logfile::apend()`函数写入到文件中**。`Logging`析构函数核心代码如下：
+
+```cpp
+Logger::~Logger()
+{
+    ...省略代码...
+	// 得到LogStream的buffer_
+    const LogStream::SmallBuffer& buf(stream().buffer());
+    // 输出(默认向终端输出)
+    g_output(buf.data(), buf.length());
+    // FATAL情况终止程序
+    if (impl_.level_ == FATAL)
+    {
+        g_flush();  // 把缓冲区的数据强制写入指定的位置（默认是写入stdout）
+        abort();
+    }
+}
+
+void Logger::setOutput(OutputFunc out)  
+{
+    g_output = out;
+}
+```
+
+<a name="QTgDR"></a>
+
+
+
+疑问解答
+
+##### LogFile类的append什么时候需要加锁
+
+- 同步的时候需要，因为多个线程都可能产生日志，即`LOG_INFO << something`，他们都同时要写入同一个文件，所以需要加锁，
+- 异步的后端线程写入文件不需要加锁。
+- 但产生日志的**前端线程**有很多，在写入**用户开辟的大缓冲区**时确实需要**加锁**，但是这只是写入缓冲区，并不是写入文件，**当大缓冲区被写满后**，**唤醒后端线程**就会接管这个写满的大缓冲区，然后把**写满的大缓冲区的日志通过`LogFile`写入到文件**中，也就是说，异步日志开启的情况下，写文件的永远之后异步日志的后台线程，根本**不存在竞争**，所以不需要**加锁**。
+
+```cpp
+void LogFile::append(const char* logline, int len)
+{
+    if (mutex_)		//同步日志需要加锁
+    {
+        std::unique_lock<std::mutex> lock(*mutex_);
+        append_unlocked(logline, len);
+    }
+    else			// 异步日志不需要加锁
+    {
+    	append_unlocked(logline, len);
+    }
+}
+
+void LogFile::flush()
+{
+    if (mutex_)		//同步日志需要加锁
+    {
+        std::unique_lock<std::mutex> lock(*mutex_);
+        file_->flush();
+    }
+    else			// 异步日志不需要加锁
+    {
+    	file_->flush();
+    }
+}
+```
+
+
+
+<a name="TkPUb"></a>
+
+`FileUtil`为什么要开辟一个64KB的`buffer_`
+
+`FileUtil`的作用是把**给定的数据写入到指定的文件**中，回答这个问题首先需要了解IO缓冲区。
+<a name="geVjF"></a>
+
+IO工作流程
+
+当我们向**文件指针`fp_`指向的文件**写入数据时，数据并不是立即被写入到文件，而是系统提供了一个缓冲区（这个缓冲区我们不可见，当然我们也可以通过`setbuffer`来为`fp_`指定缓冲区），当我们**调用`fwrite`时**，数据先被**写入缓冲区**，当**缓冲区满**后，才会把**数据写入文件**。另外，如果不希望缓冲区写满后再写入文件，可以调用**`fflush`刷新缓冲区**，即把缓冲区的数据立即写入到文件中。
+<a name="VmQhG"></a>
+
+`FileUtil`为什么要开辟一个64KB的`buffer_`
+
+- 系统提供的**缓冲区小**，如果日志很多且密集，那**缓冲区容易写满**，也就会很频繁的向文件中写入数据，IO是比较耗时的，如果**频繁向文件写入数据**那时间都**花在写文件上**了，而没时间去处理业务了，
+- 所以可以手动为**`FileUtil`类的文件指针`fp_`指定一个比较大的缓冲区**，这样当日志很密集时，也不会很频繁的写入文件。<br />注意`FileUtil`的`apend`函数尽管**通过循环不断向文件指针`fp_`指向的文件写数据**，但不代表数据一定被写入到文件了，因为我们在`FileUtil`构造函数中为`fp_`指定了一块很大的缓冲区（64KB），
+- `apend`尽管通过循环调用`write`一直向`fp_`指向的文件写数据，直到把给的`data`写完为止时，**很可能缓冲区还是没写满**，因此，不会立马写入到文件，而是**暂时缓存在我们指定的缓冲区**中（看起来像是数据全部写入文件了），**当调用`flush`或者`write`时缓冲区满了，那就会立即写入文件**，不过这些都是`wirte`函数调用的`fwrite`帮我们处理的事，不需要我们管，我们只需要不断调用`fwrite`，感觉数据全部写入了文件就行，至于数据是暂时放在缓冲区还是写入文件，就由`fwrite`替我们操心去吧。
+
+```cpp
+void FileUtil::append(const char* data, size_t len)
+{
+    // 记录已经写入的数据大小
+    size_t written = 0;
+    while (written != len)                          	// 只要没写完就一直写
+        {
+            // 还需写入的数据大小
+            size_t remain = len - written;
+            size_t n = write(data + written, remain);   // 返回成功写如入了n字节
+            if (n != remain)                            // 剩下的没有写完就看下是否出错，没出错就继续写
+            {
+                int err = ferror(fp_);
+                if (err)
+                {
+                    fprintf(stderr, "FileUtil::append() failed %s\n", getErrnoMsg(err));
+                }
+            }
+            // 更新写入的数据大小
+            written += n;
+        }
+    // 记录目前为止写入的数据大小，超过限制会滚动日志(滚动日志在LogFile中实现)
+    writtenBytes_ += written;
+}
+```
+
+<a name="trk8s"></a>
+
+
+
+###### 服务器崩溃，⽇志系统发⽣什么、解决
+
+**发生情况：**
+
+1. **日志丢失**： 如果日志系统配置为缓存日志信息并且定期写入磁盘，那么崩溃时还未写入磁盘的日志信息可能会丢失。
+2. **日志不完整**： 服务器在写入日志时崩溃，可能会导致最后一部分日志信息不完整。
+3. **文件损坏**： 如果崩溃发生在日志文件写入操作的过程中，可能会导致日志文件损坏。
+4. **性能下降**： 如果服务器崩溃后自动重启，并且大量的日志写入操作在启动时进行，可能会暂时影响服务器的性能。
+
+**解决：**
+
+1. **日志分割**： 定期分割日志文件，减少单个日志文件的大小，这样即使某个日志文件损坏，也只影响一小部分数据。
+2. **数据恢复策略**： 定期备份日志文件，以便在文件损坏时可以从备份中恢复。
+3. **事务日志**： 对于数据库等系统，使用事务日志可以在发生崩溃时恢复到最后一次一致的状态。
+4. **使用写前日志（Write-Ahead Logging, WAL）**： 在更新数据之前先写入日志，确保即使发生故障，也能够恢复到故障发生前的状态。
+5. **系统自动重启后的日志处理**： 确保系统崩溃重启后，有清晰的日志处理流程，比如先处理残留的旧日志数据，再开始正常的日志记录。
+6. **错误处理机制**： 为日志系统实现错误处理机制，比如在捕获到写入错误时，可以重试或将日志写入备用存储。
 
 
 
