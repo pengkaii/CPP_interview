@@ -2101,7 +2101,7 @@ Reactor模型是⼀个针对同步I/O的⽹络模型，主要是使⽤⼀个reac
 
 
 
-###### 双缓冲过程
+##### 双缓冲过程
 
 - 在0~3秒之间，**前端线程**调用宏`LOG_INFO << 日志信息;`，会开辟一个4KB内存空间，放一条log日志信息，然后存储到前端Buffers_**4M写满缓冲区队列**（黄色Buffer)中，同时析构自己刚开辟的4KB的空间。考虑到多个前端线程会往4M大缓冲区队列放一条日志，当前前端线程需要加锁处理，保证线程安全<br />
 - 在**3秒超时**或者**前端的当前小缓冲区写满**之后，后端线程被唤醒，为了让**前端线程**阻塞时间更短，后端线程也需要加锁，把后端待写缓冲区队列Buffer和前端写满缓冲区队列Buffer互换，互换后后端线程释放锁，这样前端线程又可以向红色Buffer中写入新的日志信息。后端线程也可以把来自前端的黄色Buffer中的数据写入文件。
@@ -3174,7 +3174,313 @@ b.不使用双向链表，使用最小堆结构可以进行优化。
 
 
 
+
+
 #### 8、主从状态机与HTTP请求
+
+##### 代码
+
+-  HttpConnection类 给连接套接字connect_fd 绑定事件处理回调
+- 给连接套接字绑定读、写、连接的回调函数
+- 得到服务器资源目录
+- http连接析构时 关闭连接套接字
+- 
+- 给fd注册默认事件, 这里给了超时时间，所以会绑定定时器和http对象
+- 从epoll事件表中删除fd(绑定的定时器被删除时 会调用此函数),然后http连接释放，会close掉fd。
+  注意需要延长 HttpConnection 的寿命，避免 HttpConnection 在函数执行过程中主动关闭导致 coredump
+
+
+
+###### 处理读 
+
+- 读请求报文数据到 read_buffer 解析请求报文 构建响应报文并写入write_buffer
+- 读客户端发来的请求数据 存入read_buffer
+- 标记为error的都是直接返回错误页面
+- 有请求出现但是读不到数据，可能是Request Aborted，或者来自网络的数据没有达到等原因，最可能是对端已经关闭了，统一按照对端已经关闭处理
+
+
+
+###### 解析请求行
+
+- 读到完整的请求行再开始解析请求
+- read_buffer去掉请求行
+- GET /filename HTTP1.1 请求方法
+- GET /filename HTTP1.1 请求文件名
+- 没找到 就默认访问主页，http版本默认1.1
+- 找到了文件名 再找空格
+- 找到了空格 ,后一个字符到空格前一个字符就是文件名,?表示如果有参数 只取参数前的请求文件名，找到/并且只有一个字符 那就是/ 默认进index.html
+- GET /filename HTTP/1.1 版本号
+
+
+
+###### 解析请求头
+
+- 成功解析完一个完整的请求头，将剩余的请求数据保存，并返回解析成功
+- 返回需要继续解析下一个请求头的标记
+
+- 如果是GET方法此时已解析完成 
+- 如果是POST方法 **继续解析请求体**
+
+- 
+
+```c++
+if (method_ == METHOD_POST) {
+      // POST方法
+      process_state_ = STATE_RECV_BODY;
+      } else {
+          process_state_ = STATE_RESPONSE;
+      }
+```
+
+###### post方法
+
+- 读取Content-Length字段以确定请求体的大小
+- 构建响应报文并写入write_buffer
+- 如果成功解析，将响应报文数据发送给客户端
+- 如果read_buffer还有数据 就调用自己继续读
+- 如果没发生错误 对端也没关闭 此次没处理完 就下次再处理
+
+```c++
+// 检查处理状态是否为STATE_RECV_BODY
+if (process_state_ == STATE_RECV_BODY) {
+    // 读取Content-Length字段以确定请求体的大小
+    int content_length = -1;
+    if (request_headers_.find("Content-Length") != request_headers_.end()) {
+        content_length = std::stoi(request_headers_["Content-Length"]);
+    } else {
+        // 如果缺少Content-Length字段，则标记为错误并返回400 Bad Request响应
+        is_error_ = true;
+        ReturnErrorMessage(connect_fd_, 400, "Bad Request: Lack of 'Content-Length' header");
+        break;
+    }
+
+    // 检查是否已经接收到足够的请求体数据
+    if (read_buffer_.size() < content_length) {
+        break;
+    }
+
+    // 切换处理状态到STATE_RESPONSE
+    process_state_ = STATE_RESPONSE;
+}
+
+// 构建响应报文并写入write_buffer
+if (process_state_ == STATE_RESPONSE) {
+    ResponseState response_state = BuildResponse();
+    if (response_state == RESPONSE_SUCCESS) {
+        // 如果成功构建响应，则切换处理状态到STATE_FINISH
+        process_state_ = STATE_FINISH;
+        break;
+    } else {
+        // 如果构建响应失败，则标记为错误
+        is_error_ = true;
+        break;
+    }
+}
+
+```
+
+
+
+###### 处理写 
+
+-  向客户端发送write_buffer中的响应报文数据
+- 如果没有发生错误 并且连接没断开 就把写缓冲区的数据 发送给客户端
+- 如果还没有写完 就等待下次写事件就绪接着写
+          if (write_buffer_.size() > 0) {
+              events |= EPOLLOUT;
+          }
+
+
+
+- 处理更新事件回调 
+  void HttpConnection::HandleUpdate() {}
+- 删除定时器（后面会重新绑定新定时器，相当于更新到期时间)
+- 还处在建立连接状态,如果事件不为0，说明在处理时添加了(EPOLLIN或者EPOLLOUT)
+- 如果keep-alive 则超时时间就设为5分钟，否则就是5秒
+- 如果监听事件是读加写，就变为写, 最后用ET边缘触发模式
+- 更新监听事件， 以及重新绑定新定时器, Loop最后调HandleExpire会删掉旧的定时器
+- 当前没有事件 并且keep-alive 监听可读事件
+
+
+
+
+
+
+
+###### 处理错误（返回错误信息）
+
+- 响应体
+- 响应头
+- 错误处理不考虑write不完的情况
+
+
+
+
+
+###### 构建响应报文并写入write_buffer
+
+- POST方法 暂时返回500
+- GET | HEAD方法
+- 如果在请求头中找到Connection字段 看是不是keep-alive
+- 如果是请求图标 把请求头+图标数据(请求体)写入write_buffer
+- 根据文件类型 来设置mime类型
+- 查看请求的文件权限
+- 请求文件名 = 资源目录 + 文件名
+- 请求的文件没有权限返回403
+- 请求头后的空行\r\n
+- 请求HEAD方法 不必返回响应体数据 此时就已经完成 
+- 先在缓存中找
+- 请求的文件不存在返回404
+- 将文件内容通过mmap映射到一块共享内存中。映射共享内存失败 也返回404
+- 将共享内存里的内容 写入write_buffer
+-  加入缓存
+- 关闭映射
+
+
+
+###### 代码1
+
+```c++
+// httpConnection类的构造函数
+httpConnection::httpConnection(sp_Channel channel)
+    : channel_(channel),
+// 初始化channel_成员，用于处理这个连接的网络事件
+      nowReadPos_(0),
+// 初始化读取位置
+      parseState_(ParseState::PARSE_REQUSET), 
+// 初始化解析状态为请求解析
+      basePath_("page/"), 
+// 设置基础路径为"page/"
+      method_(HttpMethod::METHOD_GET), 
+// 默认请求方法为GET
+      HTTPVersion_(HttpVersion::HTTP_11), 
+// 默认HTTP版本为1.1
+      keepAlive_(false) 
+          // 默认不保持连接
+{
+    // 设置状态机的处理函数
+    handleParse_[0] = bind(&httpConnection::parseError, this);
+    handleParse_[1] = bind(&httpConnection::parseRequest, this);
+    handleParse_[2] = bind(&httpConnection::parseHeader, this);
+    handleParse_[3] = bind(&httpConnection::parseSuccess, this);
+
+    // 设置Channel的回调函数
+    channel_->setReadHandler(bind(&httpConnection::handleRead, this));
+    channel_->setEvents(DEFAULT_EVENT); 
+          // 设置默认事件
+    LOG << "create a httpConnection";
+          // 记录日志
+}
+
+// 重置httpConnection对象的状态
+void httpConnection::reset()
+{
+    fileName_.clear(); 
+    // 清除文件名
+    nowReadPos_ = 0; 
+    // 重置读取位置
+    parseState_ = ParseState::PARSE_REQUSET; 
+    // 重置解析状态
+    headers_.clear();
+    // 清除头部信息
+}
+
+// 在缓冲区中查找字符串
+bool httpConnection::findStrFromBuffer(string &msg, string str)
+{
+    size_t pos = inBuffer_.find(str, nowReadPos_); 
+    // 在缓冲区中查找字符串
+    if (pos == string::npos)
+        // 如果未找到
+        return false;
+    msg = inBuffer_.substr(nowReadPos_, pos - nowReadPos_); // 提取字符串
+    nowReadPos_ = pos + str.size(); 
+    // 更新读取位置
+
+    return true;
+}
+
+```
+
+###### 代码2（看这）
+
+```c++
+// 处理读取到的数据
+void httpConnection::handleRead()
+{
+    // 读取客户端发送的数据
+    // 使用非阻塞的方式读取，利用状态机处理不同的读取状态
+    // 根据读取到的数据更新解析状态
+}
+
+// 解析请求行
+ParseState httpConnection::parseRequest()
+{
+    // 解析HTTP请求的第一行，即请求行
+    // 获取请求方法（GET、POST等），请求的URI和HTTP版本
+    // 更新状态机状态以转移到解析头部信息
+}
+
+// 解析请求头
+ParseState httpConnection::parseHeader()
+{
+    // 逐行解析HTTP请求的头部
+    // 提取并存储各种头部字段，如Content-Type, Connection等
+    // 在完成头部解析后，更新状态以准备解析请求体或完成解析
+}
+
+// 处理解析错误
+ParseState httpConnection::parseError()
+{
+    // 当请求解析出错时的处理逻辑
+    // 根据错误类型设置错误响应，如400 Bad Request或404 Not Found
+    // 更新状态机，准备发送错误响应
+}
+
+// 成功解析请求
+ParseState httpConnection::parseSuccess()
+{
+    // 当请求成功解析时的处理逻辑
+    // 设置状态为准备回应（发送HTTP响应）
+    // 根据请求的类型和路径准备相应的HTTP响应内容
+}
+
+// 处理成功的请求，生成HTTP响应
+void httpConnection::handleSuccess()
+{
+    // 生成HTTP响应内容
+    // 根据请求的类型、文件类型等生成响应头和响应体
+    // 设置适当的响应头，如Content-Type和Content-Length
+    // 将生成的响应发送给客户端
+}
+
+// 处理错误的请求，生成错误响应
+void httpConnection::handleError(int err_num, string short_msg)
+{
+    // 根据错误编号和简短信息生成错误响应
+    // 设置响应状态码和状态消息，如404 Not Found
+    // 生成包含错误信息的HTML页面，发送给客户端
+}
+```
+
+
+
+#####  状态机解析报文整体流程
+
+ **从状态机负责读取报文的一行，主状态机负责对该行数据进行解析**。每解析一部分都会将整个请求的 `m_check_state` 状态改变，状态机也就是根据这个状态来进行不同部分的解析跳转的：
+
+- 主状态机有三种状态：CHECK_STATE_REQUESTLINE，
+- 解析请求行；CHECK_STATE_HEADER，
+- 解析请求头；CHECK_STATE_CONTENT，
+- **解析消息体，仅用于解析POST请求**；
+
+- `parse_request_line(text)`，解析请求行，通过请求行的解析我们可以判断该HTTP请求的类型（GET/POST），而请求行中最重要的部分就是URL部分，我们会将这部分保存下来用于后面的生成HTTP响应。
+- `parse_headers(text)`：解析请求头部，就是GET和POST中空行以上，请求行以下的部分。
+- `parse_content(text)`：解析请求数据，对于GET来说这部分是空的，因为这部分内容已经以明文的方式包含在了请求行中的URL部分了；只有POST的这部分是有数据的，项目中的这部分数据为**用户名和密码**，我们会根据这部分内容**做登录和校验**。
+
+
+
+
 
 ##### 有限状态机原理
 
@@ -3257,19 +3563,6 @@ HTTP请求报文：请求行（request line）、请求头部（header）、空�
 响应报文:状态行、消息报头、空行和响应正文。
 
 
-
-######  状态机解析报文整体流程
-
- **从状态机负责读取报文的一行，主状态机负责对该行数据进行解析**。每解析一部分都会将整个请求的 `m_check_state` 状态改变，状态机也就是根据这个状态来进行不同部分的解析跳转的：
-
-- 主状态机有三种状态：CHECK_STATE_REQUESTLINE，
-- 解析请求行；CHECK_STATE_HEADER，
-- 解析请求头；CHECK_STATE_CONTENT，
-- 解析消息体，仅用于解析POST请求；
-
-- `parse_request_line(text)`，解析请求行，通过请求行的解析我们可以判断该HTTP请求的类型（GET/POST），而请求行中最重要的部分就是URL部分，我们会将这部分保存下来用于后面的生成HTTP响应。
-- `parse_headers(text)`：解析请求头部，就是GET和POST中空行以上，请求行以下的部分。
-- `parse_content(text)`：解析请求数据，对于GET来说这部分是空的，因为这部分内容已经以明文的方式包含在了请求行中的URL部分了；只有POST的这部分是有数据的，项目中的这部分数据为**用户名和密码**，我们会根据这部分内容**做登录和校验**。
 
 
 
